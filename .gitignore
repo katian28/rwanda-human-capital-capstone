@@ -16,6 +16,9 @@ figures/*
 results/*
 !figures/.gitkeep
 !results/.gitkeep
+!figures/published-weight-gdp-replication.png
+!results/published-weight-replication.csv
+!results/replication-validation.md
 
 # R
 .Rhistory
