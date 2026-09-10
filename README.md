@@ -7,13 +7,36 @@ This repository contains the reproducible research workflow for a Minerva Univer
 The project has two stages:
 
 1. Replicate Hodler's synthetic-control estimate of Rwanda's post-genocide GDP recovery.
-2. Extend the design to a human-capital outcome, provisionally gross secondary-school enrollment, with additional outcomes used for robustness when the data permit.
+2. Extend the design to human capital. The current recommendation is PWT 8.0 `hc` as the technically feasible primary outcome, with Barro–Lee attainment and post-1999 WDI/UIS enrollment as supporting analyses.
 
 The intended audience includes researchers and practitioners in development economics, education policy, post-conflict reconstruction, and impact evaluation.
 
 ## Current status
 
-The project is in its initial feasibility and replication stage. The primary outcome, donor pool, specification, and robustness plan remain subject to data validation and advisor feedback.
+**Current verdict (9 September 2026): proceed with a close GDP replication and redesign the extension.** The exact PWT releases are available, but no author code or assembled replication package has been located. Current WDI secondary enrollment fails the conventional balanced-panel screen; PWT 8.0 human capital has complete annual coverage for Rwanda and 27 eligible donors.
+
+The first replication checkpoint is complete. Applying the published donor weights to PWT 8.0 `rgdpe` reproduces the headline 1994 gap, pre-treatment RMSPE, and 2011 closure. The manuscript names `rgdpo`, but that variable does not reproduce the published path. See the [validation memo](results/replication-validation.md) and [reconstruction figure](figures/published-weight-gdp-replication.png).
+
+## Project knowledge base
+
+This repository is the canonical record for the project. Research decisions, source links, feasibility findings, advisor-approved changes, and weekly progress should be documented here before they are treated as settled.
+
+- [Replication feasibility audit](docs/replication-feasibility.md)
+- [Human-capital data availability audit](docs/data-availability.md)
+- [Full feasibility report and decision memo](docs/feasibility-report.md)
+- [Source register](docs/source-register.md)
+- [Knowledge-base standards and navigation](docs/README.md)
+- [Weekly process log](process-log/)
+- [Reading notes](references/reading-notes.md)
+
+## Priority for 9–13 September 2026
+
+This week's evidence-backed decisions are:
+
+1. **Original finding:** a close replication with original PWT vintages is feasible; exact numerical replication remains conditional on remaining historical predictors and undocumented preprocessing.
+2. **Extension:** retain the question, but do not use current WDI secondary enrollment as the primary outcome in conventional `Synth`.
+
+The dated execution plan and go/no-go checkpoint are in the [decision memo](docs/feasibility-report.md).
 
 ## Repository structure
 
