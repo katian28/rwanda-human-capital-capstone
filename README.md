@@ -1,4 +1,4 @@
-# Capstone 2026–27 — {{STUDENT_NAME}}
+# Capstone 2026–27 — Gwaneza Katia Nkurunziza
 
 This repository is the record of your capstone project. It is private: only you and your supervisor can see it. You own everything in it.
 
@@ -79,41 +79,9 @@ Either way, run `git remote -v` afterwards and check it points where you expect.
 If your work is not arriving in this repository, I cannot see it, and as far as
 the record is concerned it did not happen.
 
-<!-- TOOL:code -->
 ## If you are building software
 
 Work in the cloned folder as you normally would. Commit with a short message describing the change; push when you stop. Keep secrets (API keys, credentials) out of the repo — use a `.env` file listed in `.gitignore`.
-<!-- /TOOL:code -->
-
-<!-- TOOL:overleaf -->
-## If you write in Overleaf
-
-GitHub sync is a paid Overleaf feature. Check whether your Overleaf account is on a premium or institutional plan.
-
-*If it is:* in your Overleaf project open **Integrations → GitHub**, link it to this repository, and at the end of every writing session click **Push Overleaf changes to GitHub**. Overleaf does not sync automatically — you have to press the button.
-
-*If it is not:* write locally instead. Install VS Code and the LaTeX Workshop extension (or use Typst if you're starting fresh), keep your `.tex`/`.bib`/figures in the cloned folder, and push with GitHub Desktop when you stop. If you must stay on free Overleaf, at the end of each session use **Menu → Download → Source**, unzip it over the cloned folder, then commit and push — but this is easy to forget, so prefer the local route.
-<!-- /TOOL:overleaf -->
-
-<!-- TOOL:docs -->
-## If you write in Google Docs
-
-Preferred: switch to writing in Markdown in a local editor (VS Code, Typora, Obsidian — your choice) inside the cloned folder, and push with GitHub Desktop when you stop. Markdown is close to what you already do, and we can produce a Word or PDF version at the end.
-
-If you'd rather stay in Docs: at the end of each writing session, **File → Download → Markdown (.md)**, save it into the cloned folder as `paper.md` (overwriting the previous one), then Commit and Push in GitHub Desktop. It takes about thirty seconds once you've done it twice.
-<!-- /TOOL:docs -->
-
-<!-- TOOL:local-md -->
-## If you write in Markdown locally
-
-Keep `paper.md`, your bibliography, and figures in the cloned folder. Push when you stop.
-<!-- /TOOL:local-md -->
-
-<!-- TOOL:local-latex -->
-## If you write LaTeX locally
-
-Keep your `.tex`, `.bib`, and figures in the cloned folder. Add build products (`*.aux`, `*.log`, `*.pdf` if you like) to `.gitignore`. Push when you stop.
-<!-- /TOOL:local-latex -->
 
 ## Privacy and ownership
 
