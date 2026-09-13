@@ -1,0 +1,10 @@
+.env
+.DS_Store
+node_modules/
+__pycache__/
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.synctex.gz
