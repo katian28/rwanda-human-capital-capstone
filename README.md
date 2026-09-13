@@ -2,9 +2,9 @@
 
 This repository is the record of your capstone project. It is private: only you and your supervisor can see it. You own everything in it.
 
-## The one rule
+## Pushing your work
 
-**Commit and push every time you stop working.** Not weekly, not before our meeting — every time you close the laptop. The history of how your project developed is part of what is assessed, and it is also yours: it will write most of your final reflection for you.
+**I recommend that you commit and push whenever you stop working** — every time you close the laptop. At a minimum, push once a week, even if the week was a thin one. The history of how your project developed is part of what is assessed, and it is also yours: it will write most of your final reflection for you.
 
 ## What lives here
 
