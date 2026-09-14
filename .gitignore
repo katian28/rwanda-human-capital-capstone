@@ -1,10 +1,54 @@
+# Credentials and local configuration
 .env
-.DS_Store
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Data are excluded until licensing and disclosure checks are complete
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Generated outputs
+figures/*
+results/*
+!figures/.gitkeep
+!results/.gitkeep
+!figures/published-weight-gdp-replication.png
+!results/published-weight-replication.csv
+!results/replication-validation.md
+
+# Node and dependencies
 node_modules/
+.venv/
+venv/
+
+# R
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+renv/library/
+renv/staging/
+
+# Python
 __pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+
+# LaTeX
 *.aux
 *.bbl
 *.blg
 *.fdb_latexmk
 *.fls
 *.synctex.gz
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+*.swp
