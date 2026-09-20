@@ -31,6 +31,8 @@ This is insufficient for standard `Synth` estimation on a continuous balanced ou
 
 The [UIS Data Browser](https://databrowser.uis.unesco.org/resources/bulk) offers current bulk files and an API. Its archive should still be checked for observations or vintages not propagated to WDI, but a different interface should not be presumed to solve genuine reporting gaps.
 
+**Checked 20 September 2026: does Rwandan government administrative data (MINEDUC) fill the gap?** No. Bridgeland, Wulsin & McNaught (2009), *Rebuilding Rwanda* (Civic Enterprises/Hudson Institute), reproduces MINEDUC's own secondary-education statistics table (Appendix E) — it starts in 1997, not earlier. The same report states secondary schools did not reopen until 20 October 1994 (twelfth grade first, to keep prospective teachers on track). This means the 1994–1998 gap most likely reflects a genuine administrative and system collapse — schools not operating, no data to collect — rather than an international database simply failing to propagate a national figure that exists elsewhere. This should be stated in the paper as substantive, not merely a data-access limitation.
+
 ## PWT 8.0 human capital: technically feasible, conceptually limited
 
 The exact [PWT 8.0](https://www.rug.nl/ggdc/productivity/pwt/pwt-releases/pwt8.0?lang=en) release used by Hodler contains annual `hc` values for Rwanda and 27 eligible donors throughout 1970–2011. This passes the balanced-panel availability screen and preserves the original treatment date and donor logic.

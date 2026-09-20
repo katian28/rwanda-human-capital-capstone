@@ -20,6 +20,7 @@
 - Freedom House: https://freedomhouse.org/report/freedom-world — political rights; document access/reuse conditions for the selected file.
 - Polity IV legacy project: https://www.systemicpeace.org/polity/polity4.htm — identify and archive the matching historical release.
 - Barro–Lee: https://barrolee.github.io/BarroLeeDataSet/ — five-year educational-attainment data and methodology.
+- Bridgeland, J., Wulsin, S., & McNaught, M. (2009). *Rebuilding Rwanda: From Genocide to Prosperity Through Education*. Civic Enterprises, LLC, with Hudson Institute. https://files.eric.ed.gov/fulltext/ED509757.pdf — Appendix E reproduces Rwanda Ministry of Education (MINEDUC) secondary-education statistics; the table itself starts in 1997, and the report states secondary schools did not reopen until 20 October 1994. Checked 20 September 2026 to see whether Rwandan government administrative data could fill the WDI 1994–1998 gap; it cannot — MINEDUC's own compiled series has the same gap.
 
 ## Search conclusion
 

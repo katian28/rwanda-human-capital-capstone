@@ -19,6 +19,27 @@ results/*
 !figures/published-weight-gdp-replication.png
 !results/published-weight-replication.csv
 !results/replication-validation.md
+!figures/independent-weight-reestimation.png
+!results/independent-weight-reestimation.csv
+!results/independent-weight-reestimation.md
+!figures/placebo-in-space.png
+!figures/placebo-in-time.png
+!results/placebo-in-space.csv
+!results/placebo-in-time.csv
+!results/placebo-tests.md
+!figures/placebo-in-space-full.png
+!results/placebo-in-space-full.csv
+!results/placebo-in-time-full.csv
+!results/placebo-tests-full.md
+!figures/human-capital-extension.png
+!results/human-capital-extension.csv
+!results/human-capital-extension.md
+!results/human-capital-placebo-in-space.csv
+!figures/robustness-barro-lee.png
+!figures/robustness-wdi-enrollment.png
+!results/robustness-barro-lee.csv
+!results/robustness-wdi-enrollment.csv
+!results/robustness-checks.md
 
 # Node and dependencies
 node_modules/
