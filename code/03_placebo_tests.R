@@ -1,92 +1,97 @@
 #!/usr/bin/env Rscript
-
-# Placebo-based inference for the Rwanda GDP synthetic control.
+# Placebo tests for the 9-country donor pool (the published-weight
+# countries only), using the real Synth package -- not a hand-rolled fit.
+# This is a restricted-pool SENSITIVITY check, not the headline placebo
+# result: see code/10_synth_package_placebo_full_pool.R for the full
+# 39-country test, which is the one to trust.
 #
-# In-space placebo: reassign the "treatment" to each donor country in turn
-# (using the remaining donors, excluding Rwanda, as its synthetic control)
-# and compare Rwanda's post/pre RMSPE ratio to the resulting placebo
-# distribution (Abadie, Diamond & Hainmueller 2010 style rank inference).
-#
-# In-time placebo: pretend the treatment happened in 1985 instead of 1994,
-# fit weights on the pre-1985 window only, and check whether a spurious gap
-# opens up before the genocide actually occurred.
-#
-# Uses the same 9-country donor pool as the published weights (not the full
-# ~39-country Sub-Saharan Africa pool from docs/replication-feasibility.md).
-# Fast version: flags the full donor-pool placebo run as a follow-up, not
-# required for this checkpoint.
+# In-space placebo: reassign the "treatment" to each donor country in
+# turn and see how big a gap it gets by chance, compared to Rwanda's.
+# In-time placebo: pretend the genocide happened in 1985 instead of 1994,
+# and check whether a spurious gap opens up before it actually did.
 
-suppressPackageStartupMessages({
-  library(readxl)
-  library(quadprog)
-})
+library(readxl)  # to read the PWT 8.0 Excel file
+library(Synth)   # the actual synthetic control package
 
-data_file <- "data/raw/pwt80.xlsx"
-dir.create("results", showWarnings = FALSE)
-dir.create("figures", showWarnings = FALSE)
-stopifnot(file.exists(data_file)) # produced by code/02_reestimate_weights.R
+# ---- 1. Load and prepare the data -----------------------------------------
 
-pwt <- as.data.frame(read_excel(data_file, sheet = "Data"))
+pwt <- read_excel("data/raw/pwt80.xlsx", sheet = "Data")
+pwt <- as.data.frame(pwt)
 
 donors <- c("CMR", "COG", "GAB", "LBR", "LSO", "MLI", "NER", "SDN", "SEN")
-all_units <- c("RWA", donors)
 treatment_year <- 1994
-full_years <- 1970:2011
-variable <- "rgdpe"
+first_year <- 1970
+last_year <- 2011
+outcome_var <- "rgdpe"
 
-keep <- pwt$countrycode %in% all_units & pwt$year %in% full_years
-panel <- pwt[keep, c("countrycode", "year", variable)]
-names(panel)[3] <- "value"
-panel$normalized <- NA_real_
-for (code in unique(panel$countrycode)) {
-  is_country <- panel$countrycode == code
-  base <- mean(panel$value[is_country & panel$year %in% 1991:1993])
-  panel$normalized[is_country] <- panel$value[is_country] / base
+panel <- pwt[pwt$countrycode %in% c("RWA", donors) & pwt$year %in% first_year:last_year,
+             c("countrycode", "year", outcome_var)]
+names(panel)[3] <- "gdp"
+
+for (country in unique(panel$countrycode)) {
+  is_this_country <- panel$countrycode == country
+  baseline <- mean(panel$gdp[is_this_country & panel$year %in% 1991:1993])
+  panel$gdp[is_this_country] <- panel$gdp[is_this_country] / baseline
 }
 
-wide <- reshape(
-  panel[, c("countrycode", "year", "normalized")],
-  idvar = "year", timevar = "countrycode", direction = "wide"
-)
-names(wide) <- sub("^normalized\\.", "", names(wide))
-wide <- wide[order(wide$year), ]
+panel$unit_id <- as.numeric(factor(panel$countrycode))
+id_lookup <- unique(panel[, c("countrycode", "unit_id")])
 
-fit_synthetic <- function(target, pool, pre_years, wide_data) {
-  pre <- wide_data[wide_data$year %in% pre_years, ]
-  X <- as.matrix(pre[, pool])
-  y <- pre[[target]]
-  Dmat <- t(X) %*% X + diag(1e-8, length(pool))
-  dvec <- t(X) %*% y
-  Amat <- cbind(rep(1, length(pool)), diag(length(pool)))
-  bvec <- c(1, rep(0, length(pool)))
-  qp <- solve.QP(Dmat, dvec, Amat, bvec, meq = 1)
-  w <- pmax(qp$solution, 0)
-  w <- w / sum(w)
-  setNames(w, pool)
+dir.create("results", showWarnings = FALSE)
+dir.create("figures", showWarnings = FALSE)
+
+# ---- 2. One function that fits a synthetic control for any unit/window ---
+# treated_code: the country pretending to be treated.
+# control_codes: the donor pool for that fit.
+# pre_years / plot_years: the pre-treatment fitting window and the years
+# to return (lets the same function do both the 1994 test and the fake
+# 1985 test).
+
+fit_one <- function(treated_code, control_codes, pre_years, plot_years) {
+  treated_id <- id_lookup$unit_id[id_lookup$countrycode == treated_code]
+  control_ids <- id_lookup$unit_id[id_lookup$countrycode %in% control_codes]
+
+  dp <- dataprep(
+    foo = panel,
+    dependent = "gdp",
+    unit.variable = "unit_id",
+    unit.names.variable = "countrycode",
+    time.variable = "year",
+    treatment.identifier = treated_id,
+    controls.identifier = control_ids,
+    time.predictors.prior = pre_years,
+    time.optimize.ssr = pre_years,
+    time.plot = plot_years,
+    special.predictors = list(
+      list("gdp", pre_years[1]:(pre_years[1] + 9), "mean"),
+      list("gdp", (pre_years[1] + 10):(pre_years[1] + 19), "mean"),
+      list("gdp", tail(pre_years, 4), "mean")
+    )
+  )
+
+  fit <- synth(dp, quiet = TRUE)
+  actual <- dp$Y1plot[, 1]
+  synthetic <- as.numeric(dp$Y0plot %*% fit$solution.w)
+  data.frame(year = plot_years, actual = actual, synthetic = synthetic, gap = actual - synthetic)
 }
 
-rmspe <- function(gap, years, res) sqrt(mean(gap[res$year %in% years]^2))
+rmspe <- function(gap, mask) sqrt(mean(gap[mask]^2))
 
-# ---- In-space placebo -------------------------------------------------
+# ---- 3. In-space placebo: Rwanda, then every donor in turn ---------------
 
-pre_years <- 1970:(treatment_year - 1)
-post_years <- treatment_year:2011
+pre_years <- first_year:(treatment_year - 1)
+plot_years <- first_year:last_year
 
-run_unit <- function(target, pool) {
-  w <- fit_synthetic(target, pool, pre_years, wide)
-  synthetic <- vapply(wide$year, function(yr) {
-    row <- wide[wide$year == yr, pool]
-    sum(w * as.numeric(row))
-  }, numeric(1))
-  res <- data.frame(year = wide$year, actual = wide[[target]], synthetic = synthetic)
-  res$gap <- res$actual - res$synthetic
-  pre_r <- rmspe(res$gap, pre_years, res)
-  post_r <- rmspe(res$gap, post_years, res)
-  list(unit = target, res = res, pre_rmspe = pre_r, post_rmspe = post_r, ratio = post_r / pre_r)
+run_in_space_unit <- function(treated) {
+  pool <- setdiff(donors, treated)  # RWA's pool is all 9 donors; a donor's pool excludes itself
+  res <- fit_one(treated, pool, pre_years, plot_years)
+  pre_r <- rmspe(res$gap, res$year < treatment_year)
+  post_r <- rmspe(res$gap, res$year >= treatment_year)
+  list(unit = treated, res = res, ratio = post_r / pre_r, pre_rmspe = pre_r, post_rmspe = post_r)
 }
 
-rwanda_run <- run_unit("RWA", donors)
-placebo_runs <- lapply(donors, function(d) run_unit(d, setdiff(donors, d)))
+rwanda_run <- run_in_space_unit("RWA")
+placebo_runs <- lapply(donors, run_in_space_unit)
 
 in_space <- do.call(rbind, lapply(c(list(rwanda_run), placebo_runs), function(r) {
   data.frame(unit = r$unit, pre_rmspe = r$pre_rmspe, post_rmspe = r$post_rmspe, ratio = r$ratio)
@@ -95,38 +100,28 @@ in_space <- in_space[order(-in_space$ratio), ]
 in_space$rank <- seq_len(nrow(in_space))
 rwanda_rank <- in_space$rank[in_space$unit == "RWA"]
 p_value <- rwanda_rank / nrow(in_space)
-
 write.csv(in_space, "results/placebo-in-space.csv", row.names = FALSE)
 
-# ---- In-time placebo (fake treatment: 1985) ----------------------------
+# ---- 4. In-time placebo: pretend the treatment was in 1985 ----------------
 
 fake_year <- 1985
-fake_pre <- 1970:(fake_year - 1)
-fake_post <- fake_year:(treatment_year - 1) # stop before the real treatment
-
-w_fake <- fit_synthetic("RWA", donors, fake_pre, wide)
-synthetic_fake <- vapply(wide$year, function(yr) {
-  row <- wide[wide$year == yr, donors]
-  sum(w_fake * as.numeric(row))
-}, numeric(1))
-in_time <- data.frame(year = wide$year, actual = wide$RWA, synthetic = synthetic_fake)
-in_time$gap <- in_time$actual - in_time$synthetic
-in_time_pre_rmspe <- rmspe(in_time$gap, fake_pre, in_time)
-in_time_post_rmspe <- rmspe(in_time$gap, fake_post, in_time)
+fake_pre <- first_year:(fake_year - 1)
+in_time <- fit_one("RWA", donors, fake_pre, plot_years)
+in_time_pre_rmspe <- rmspe(in_time$gap, in_time$year < fake_year)
+in_time_post_rmspe <- rmspe(in_time$gap, in_time$year >= fake_year & in_time$year < treatment_year)
 in_time_ratio <- in_time_post_rmspe / in_time_pre_rmspe
-
 write.csv(in_time, "results/placebo-in-time.csv", row.names = FALSE)
 
-# ---- Report -------------------------------------------------------------
+# ---- 5. Report --------------------------------------------------------------
 
 lines <- c(
-  "# Placebo tests and RMSPE-based inference",
+  "# Placebo tests, 9-country donor pool (Synth package)",
   "",
   sprintf("**Run date:** %s", format(Sys.Date(), "%d %B %Y")),
   "",
-  "## In-space placebo (donor permutations)",
+  "This is a restricted-pool sensitivity check, not the headline placebo result -- see `results/synth-package-placebo-full-pool.csv` / `code/10` for the full 39-country test. Both in-space and in-time tests here use the actual `Synth` package.",
   "",
-  "Each donor country is treated as if it were the treated unit, using the remaining 8 donors (Rwanda excluded) as its synthetic control, over the same 1970-1993 pre-period. Ranking all 9 units plus Rwanda by post/pre RMSPE ratio gives a permutation-style p-value (rank / number of units).",
+  "## In-space placebo",
   "",
   "| Rank | Unit | Pre-RMSPE | Post-RMSPE | Ratio |",
   "|------|------|-----------|------------|-------|",
@@ -138,47 +133,25 @@ lines <- c(
     collapse = "\n"
   ),
   "",
-  sprintf("**Rwanda's rank: %d of %d (p = %.3f).** ", rwanda_rank, nrow(in_space), p_value),
-  if (rwanda_rank == 1) {
-    "Rwanda has the largest post/pre RMSPE ratio of any unit in the donor pool, i.e. no placebo country shows a gap this extreme relative to its own pre-treatment fit. This supports treating the 1994 GDP gap as unusual rather than attributable to ordinary cross-country variation."
-  } else {
-    sprintf(
-      "Rwanda is not the most extreme unit (%d placebo unit(s) show a larger ratio). This weakens (without eliminating) the inferential case relative to a rank-1 result and should be reported honestly rather than reframed.",
-      rwanda_rank - 1
-    )
-  },
-  "",
-  "**Caveat:** this uses the same 9-country donor pool as the published weights, not the full ~39-country Sub-Saharan Africa donor pool described in `docs/replication-feasibility.md`. A larger placebo pool is a follow-up robustness check, not required for this checkpoint.",
+  sprintf("**Rwanda's rank: %d of %d (p = %.3f).**", rwanda_rank, nrow(in_space), p_value),
   "",
   "## In-time placebo (fake treatment year: 1985)",
   "",
-  sprintf("Fitting a synthetic Rwanda on 1970-%d only and checking for a spurious gap between %d and %d (before the real 1994 genocide):", fake_year - 1, fake_year, treatment_year - 1),
-  "",
   sprintf("- Pre-1985 RMSPE: %.4f", in_time_pre_rmspe),
   sprintf("- 1985-1993 (placebo post) RMSPE: %.4f", in_time_post_rmspe),
-  sprintf("- Ratio: %.2f", in_time_ratio),
-  "",
-  if (in_time_ratio < 2) {
-    "The ratio is small, i.e. no meaningful gap opens up between the fake 1985 treatment and the real 1994 genocide. This is consistent with the 1994 effect being a genuine break rather than a pre-existing trend."
-  } else {
-    "The ratio is non-trivial, suggesting some divergence between Rwanda and its synthetic control even before 1994. This should be reported and discussed as a limitation rather than omitted."
-  },
-  "",
-  "## Still not done (flagged, not blocking this checkpoint)",
-  "",
-  "- Full ~39-country Sub-Saharan Africa donor pool for in-space placebos (currently limited to the 9 published-weight donors).",
-  "- Placebo tests using the re-estimated (rather than published) donor weights.",
-  "- Formal confidence intervals beyond the rank-based p-value."
+  sprintf("- Ratio: %.2f", in_time_ratio)
 )
 writeLines(lines, "results/placebo-tests.md")
+
+# ---- 6. Figures -------------------------------------------------------------
 
 png("figures/placebo-in-space.png", width = 1600, height = 950, res = 170)
 par(mar = c(6.3, 4.8, 3.5, 1.5), family = "sans")
 all_gaps <- c(rwanda_run$res$gap, unlist(lapply(placebo_runs, function(r) r$res$gap)))
 plot(
-  NA, xlim = range(wide$year), ylim = range(all_gaps),
+  NA, xlim = range(plot_years), ylim = range(all_gaps),
   xlab = "Year", ylab = "Gap (actual - synthetic)",
-  main = "In-space placebo: Rwanda vs. donor-country placebo gaps"
+  main = "In-space placebo (9-country pool, Synth package)"
 )
 for (r in placebo_runs) lines(r$res$year, r$res$gap, col = "#9CA3AF", lwd = 1.2)
 lines(rwanda_run$res$year, rwanda_run$res$gap, col = "#DC2626", lwd = 3)
@@ -188,7 +161,7 @@ legend(
   "bottomleft", legend = c("Rwanda", "Placebo donors", "1994 genocide"),
   col = c("#DC2626", "#9CA3AF", "#111827"), lty = c(1, 1, 3), lwd = c(3, 1.2, 2), bty = "n"
 )
-mtext("Each grey line reassigns treatment to one donor country using the other 8 as its synthetic control", side = 1, line = 4.8, cex = 0.75, col = "#4B5563")
+mtext("Restricted 9-country sensitivity check -- see code/10 for the full-pool headline test", side = 1, line = 4.8, cex = 0.75, col = "#4B5563")
 dev.off()
 
 png("figures/placebo-in-time.png", width = 1600, height = 950, res = 170)
@@ -196,7 +169,7 @@ par(mar = c(6.3, 4.8, 3.5, 1.5), family = "sans")
 plot(
   in_time$year, in_time$actual, type = "l", lwd = 3, col = "#111827",
   xlab = "Year", ylab = "Normalized GDP (1991-1993 average = 1)",
-  main = "In-time placebo: fake 1985 treatment",
+  main = "In-time placebo: fake 1985 treatment (Synth package)",
   ylim = range(c(in_time$actual, in_time$synthetic))
 )
 lines(in_time$year, in_time$synthetic, lwd = 3, lty = 2, col = "#2563EB")

@@ -1,11 +1,13 @@
 #!/usr/bin/env Rscript
-# Full 39-country GDP placebo test, using the real Synth package instead
-# of the custom quadratic program in code/04_placebo_full_pool.R.
+# Full 39-country GDP placebo test, using the real Synth package. This is
+# the headline placebo result for the paper (not the smaller 9-country
+# version in code/03, which is a restricted-pool sensitivity check).
 # Same idea as code/09: treat each country in turn as if IT were hit by
 # the genocide in 1994, fit a synthetic control for it from the other
 # countries, and see how big its "fake" gap is. If Rwanda's real gap is
 # not bigger than most of these fake gaps, that's evidence the gap is not
-# statistically unusual.
+# statistically unusual. Section 7 adds an in-time placebo (fake 1985
+# treatment) using the same full donor pool.
 
 library(readxl)  # to read the PWT 8.0 Excel file
 library(Synth)   # the actual synthetic control package
@@ -124,3 +126,45 @@ write.csv(results, "results/synth-package-placebo-full-pool.csv", row.names = FA
 cat("\nRwanda's rank:", rwanda_rank, "of", nrow(results), "\n")
 cat("p-value (rank / total units):", round(p_value, 3), "\n")
 print(head(results, 6))
+
+# ---- 7. In-time placebo: pretend the treatment was in 1985 ----------------
+# Same full 39-country pool, but fit weights on 1970-1984 only, then check
+# 1985-1993 for a spurious gap before the real 1994 genocide.
+
+fake_year <- 1985
+fake_pre <- first_year:(fake_year - 1)
+
+dp_fake <- dataprep(
+  foo = panel,
+  dependent = "gdp",
+  unit.variable = "unit_id",
+  unit.names.variable = "countrycode",
+  time.variable = "year",
+  treatment.identifier = id_lookup$unit_id[id_lookup$countrycode == "RWA"],
+  controls.identifier = id_lookup$unit_id[id_lookup$countrycode %in% donors],
+  time.predictors.prior = fake_pre,
+  time.optimize.ssr = fake_pre,
+  time.plot = first_year:last_year,
+  special.predictors = list(
+    list("gdp", 1970:1979, "mean"),
+    list("gdp", fake_pre[length(fake_pre) - 4]:fake_pre[length(fake_pre)], "mean")
+  )
+)
+fit_fake <- synth(dp_fake, quiet = TRUE)
+actual_fake <- dp_fake$Y1plot[, 1]
+synthetic_fake <- as.numeric(dp_fake$Y0plot %*% fit_fake$solution.w)
+gap_fake <- actual_fake - synthetic_fake
+years <- first_year:last_year
+
+in_time_pre_rmspe <- sqrt(mean(gap_fake[years < fake_year]^2))
+in_time_post_rmspe <- sqrt(mean(gap_fake[years >= fake_year & years < treatment_year]^2))
+in_time_ratio <- in_time_post_rmspe / in_time_pre_rmspe
+
+write.csv(
+  data.frame(year = years, actual = actual_fake, synthetic = synthetic_fake, gap = gap_fake),
+  "results/synth-package-placebo-in-time-full-pool.csv", row.names = FALSE
+)
+cat("\nIn-time placebo (fake 1985 treatment, full pool):\n")
+cat("Pre-1985 RMSPE:", round(in_time_pre_rmspe, 4), "\n")
+cat("1985-1993 RMSPE:", round(in_time_post_rmspe, 4), "\n")
+cat("Ratio:", round(in_time_ratio, 2), "\n")
