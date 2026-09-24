@@ -43,6 +43,8 @@ results/*
 !results/robustness-barro-lee.csv
 !results/robustness-wdi-enrollment.csv
 !results/robustness-checks.md
+!results/hc-interpolation-check.csv
+!results/hc-interpolation-check.md
 
 # Node and dependencies
 node_modules/
