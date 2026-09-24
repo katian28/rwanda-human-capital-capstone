@@ -1,17 +1,16 @@
 #!/usr/bin/env Rscript
 # Placebo tests for the 9-country donor pool (the published-weight
-# countries only), using the real Synth package -- not a hand-rolled fit.
-# This is a restricted-pool SENSITIVITY check, not the headline placebo
-# result: see code/10_synth_package_placebo_full_pool.R for the full
-# 39-country test, which is the one to trust.
+# countries only). This is a restricted-pool SENSITIVITY check, not the
+# headline placebo result: see code/04_placebo_gdp_full_pool.R for the
+# full 39-country test, which is the one to trust.
 #
 # In-space placebo: reassign the "treatment" to each donor country in
 # turn and see how big a gap it gets by chance, compared to Rwanda's.
 # In-time placebo: pretend the genocide happened in 1985 instead of 1994,
 # and check whether a spurious gap opens up before it actually did.
 
-library(readxl)  # to read the PWT 8.0 Excel file
-library(Synth)   # the actual synthetic control package
+library(readxl)
+library(Synth)
 
 # ---- 1. Load and prepare the data -----------------------------------------
 
@@ -100,7 +99,7 @@ in_space <- in_space[order(-in_space$ratio), ]
 in_space$rank <- seq_len(nrow(in_space))
 rwanda_rank <- in_space$rank[in_space$unit == "RWA"]
 p_value <- rwanda_rank / nrow(in_space)
-write.csv(in_space, "results/placebo-in-space.csv", row.names = FALSE)
+write.csv(in_space, "results/placebo-restricted-in-space.csv", row.names = FALSE)
 
 # ---- 4. In-time placebo: pretend the treatment was in 1985 ----------------
 
@@ -110,16 +109,16 @@ in_time <- fit_one("RWA", donors, fake_pre, plot_years)
 in_time_pre_rmspe <- rmspe(in_time$gap, in_time$year < fake_year)
 in_time_post_rmspe <- rmspe(in_time$gap, in_time$year >= fake_year & in_time$year < treatment_year)
 in_time_ratio <- in_time_post_rmspe / in_time_pre_rmspe
-write.csv(in_time, "results/placebo-in-time.csv", row.names = FALSE)
+write.csv(in_time, "results/placebo-restricted-in-time.csv", row.names = FALSE)
 
 # ---- 5. Report --------------------------------------------------------------
 
 lines <- c(
-  "# Placebo tests, 9-country donor pool (Synth package)",
+  "# Placebo tests, 9-country donor pool",
   "",
   sprintf("**Run date:** %s", format(Sys.Date(), "%d %B %Y")),
   "",
-  "This is a restricted-pool sensitivity check, not the headline placebo result -- see `results/synth-package-placebo-full-pool.csv` / `code/10` for the full 39-country test. Both in-space and in-time tests here use the actual `Synth` package.",
+  "This is a restricted-pool sensitivity check, not the headline placebo result -- see `results/placebo-full-pool-in-space.csv` / `code/04_placebo_gdp_full_pool.R` for the full 39-country test.",
   "",
   "## In-space placebo",
   "",
@@ -141,17 +140,17 @@ lines <- c(
   sprintf("- 1985-1993 (placebo post) RMSPE: %.4f", in_time_post_rmspe),
   sprintf("- Ratio: %.2f", in_time_ratio)
 )
-writeLines(lines, "results/placebo-tests.md")
+writeLines(lines, "results/placebo-restricted.md")
 
 # ---- 6. Figures -------------------------------------------------------------
 
-png("figures/placebo-in-space.png", width = 1600, height = 950, res = 170)
+png("figures/placebo-restricted-in-space.png", width = 1600, height = 950, res = 170)
 par(mar = c(6.3, 4.8, 3.5, 1.5), family = "sans")
 all_gaps <- c(rwanda_run$res$gap, unlist(lapply(placebo_runs, function(r) r$res$gap)))
 plot(
   NA, xlim = range(plot_years), ylim = range(all_gaps),
   xlab = "Year", ylab = "Gap (actual - synthetic)",
-  main = "In-space placebo (9-country pool, Synth package)"
+  main = "In-space placebo (9-country pool)"
 )
 for (r in placebo_runs) lines(r$res$year, r$res$gap, col = "#9CA3AF", lwd = 1.2)
 lines(rwanda_run$res$year, rwanda_run$res$gap, col = "#DC2626", lwd = 3)
@@ -161,15 +160,15 @@ legend(
   "bottomleft", legend = c("Rwanda", "Placebo donors", "1994 genocide"),
   col = c("#DC2626", "#9CA3AF", "#111827"), lty = c(1, 1, 3), lwd = c(3, 1.2, 2), bty = "n"
 )
-mtext("Restricted 9-country sensitivity check -- see code/10 for the full-pool headline test", side = 1, line = 4.8, cex = 0.75, col = "#4B5563")
+mtext("Restricted 9-country sensitivity check -- see code/04 for the full-pool headline test", side = 1, line = 4.8, cex = 0.75, col = "#4B5563")
 dev.off()
 
-png("figures/placebo-in-time.png", width = 1600, height = 950, res = 170)
+png("figures/placebo-restricted-in-time.png", width = 1600, height = 950, res = 170)
 par(mar = c(6.3, 4.8, 3.5, 1.5), family = "sans")
 plot(
   in_time$year, in_time$actual, type = "l", lwd = 3, col = "#111827",
   xlab = "Year", ylab = "Normalized GDP (1991-1993 average = 1)",
-  main = "In-time placebo: fake 1985 treatment (Synth package)",
+  main = "In-time placebo: fake 1985 treatment (9-country pool)",
   ylim = range(c(in_time$actual, in_time$synthetic))
 )
 lines(in_time$year, in_time$synthetic, lwd = 3, lty = 2, col = "#2563EB")

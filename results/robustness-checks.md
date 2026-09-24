@@ -1,8 +1,8 @@
 # Robustness: Barro-Lee attainment and WDI secondary enrollment
 
-**Run date:** 20 September 2026
+**Run date:** 24 September 2026
 
-Both checks are descriptive corroboration, not synthetic-control estimates -- per `docs/data-availability.md`, Barro-Lee's five-year frequency cannot resolve annual recovery timing, and WDI enrollment is missing Rwanda 1994-1998 so cannot support a balanced-panel design. Comparison countries are the donors that already carried the most weight in this project's GDP re-estimation (code/02) and human-capital extension (code/05): Cameroon, Senegal, Zambia, Mali, Cote d'Ivoire, Niger, Mozambique, South Africa.
+Both checks are descriptive corroboration, not synthetic-control estimates -- per `docs/data-availability.md`, Barro-Lee's five-year frequency cannot resolve annual recovery timing, and WDI enrollment is missing Rwanda 1994-1998 so cannot support a balanced-panel design. Comparison countries are the donors that already carried the most weight in this project's GDP re-estimation (code/02) and human-capital extension (code/07): Cameroon, Senegal, Zambia, Mali, Cote d'Ivoire, Niger, Mozambique, South Africa.
 
 ## Barro-Lee mean years of schooling (ages 15-64), five-year intervals
 

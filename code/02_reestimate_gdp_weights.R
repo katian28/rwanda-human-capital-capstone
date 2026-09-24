@@ -85,26 +85,26 @@ print(synth.tab(synth.res = synth_out, dataprep.res = dataprep_out))
 
 # path.plot(): Rwanda's actual GDP vs. the synthetic control's GDP, over time.
 dir.create("figures", showWarnings = FALSE)
-png("figures/synth-package-gdp-path.png", width = 1400, height = 900, res = 150)
+png("figures/gdp-reestimated-path.png", width = 1400, height = 900, res = 150)
 path.plot(
   synth.res = synth_out,
   dataprep.res = dataprep_out,
   Ylab = "Normalized GDP (1991-1993 average = 1)",
   Xlab = "Year",
-  Main = "Rwanda GDP: actual vs. synthetic (Synth package)",
+  Main = "Rwanda GDP: actual vs. independently re-estimated synthetic",
   Legend = c("Rwanda", "Synthetic Rwanda")
 )
 abline(v = treatment_year, lty = 3, col = "red")  # mark the genocide year
 dev.off()
 
 # gaps.plot(): just the gap (actual minus synthetic) over time.
-png("figures/synth-package-gdp-gaps.png", width = 1400, height = 900, res = 150)
+png("figures/gdp-reestimated-gaps.png", width = 1400, height = 900, res = 150)
 gaps.plot(
   synth.res = synth_out,
   dataprep.res = dataprep_out,
   Ylab = "Gap (actual - synthetic)",
   Xlab = "Year",
-  Main = "Rwanda GDP gap (Synth package)"
+  Main = "Rwanda GDP gap (independently re-estimated weights)"
 )
 abline(v = treatment_year, lty = 3, col = "red")
 dev.off()
@@ -123,14 +123,14 @@ weights_table <- data.frame(
   published_weight = as.numeric(published_weights[donors]),
   synth_weight = round(as.numeric(synth_out$solution.w), 4)
 )
-write.csv(weights_table, "results/synth-package-gdp-weights.csv", row.names = FALSE)
+write.csv(weights_table, "results/gdp-reestimated-weights.csv", row.names = FALSE)
 
 # Actual vs. synthetic GDP, year by year.
 actual <- dataprep_out$Y1plot[, 1]                              # Rwanda's real path
 synthetic <- as.numeric(dataprep_out$Y0plot %*% synth_out$solution.w)  # weighted average of donors
 path_table <- data.frame(year = first_year:last_year, actual = actual, synthetic = synthetic)
 path_table$gap <- path_table$actual - path_table$synthetic
-write.csv(path_table, "results/synth-package-gdp-path.csv", row.names = FALSE)
+write.csv(path_table, "results/gdp-reestimated-path.csv", row.names = FALSE)
 
 # Quick headline numbers, printed so they show up when this script runs.
 pre_years <- path_table$year < treatment_year

@@ -4,7 +4,7 @@
 
 ## Rule
 
-Per `docs/replication-feasibility.md`, Hodler excludes placebo units whose own pre-treatment RMSPE exceeds the placebo group's median plus one standard deviation (threshold here: 0.2268). This is the paper's own pre-specified rule, applied here to the full 39-country placebo test from `code/10_synth_package_placebo_full_pool.R` (Synth package, not a hand-rolled fit).
+Per `docs/replication-feasibility.md`, Hodler excludes placebo units whose own pre-treatment RMSPE exceeds the placebo group's median plus one standard deviation (threshold here: 0.2268). This is the paper's own pre-specified rule, applied here to the full 39-country placebo test from `code/04_placebo_gdp_full_pool.R`.
 
 ## Result
 

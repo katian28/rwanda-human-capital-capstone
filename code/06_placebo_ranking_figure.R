@@ -1,12 +1,12 @@
 #!/usr/bin/env Rscript
 
 # Single "show and tell" figure: where does Rwanda rank among all 40 units
-# in the full-pool GDP placebo test (Synth package, code/10), by post/pre
-# RMSPE ratio. Log scale because Equatorial Guinea's ratio dwarfs
-# everything else. Title is computed from the data, not hardcoded, so it
-# can't silently go stale if the underlying numbers change.
+# in the full-pool GDP placebo test (code/04), by post/pre RMSPE ratio.
+# Log scale because Equatorial Guinea's ratio dwarfs everything else.
+# Title is computed from the data, not hardcoded, so it can't silently go
+# stale if the underlying numbers change.
 
-results <- read.csv("results/synth-package-placebo-full-pool.csv", stringsAsFactors = FALSE)
+results <- read.csv("results/placebo-full-pool-in-space.csv", stringsAsFactors = FALSE)
 results <- results[order(-results$ratio), ]
 results$rank <- seq_len(nrow(results))
 
@@ -29,7 +29,7 @@ bp <- barplot(
 title(xlab = "Post/pre RMSPE ratio (log scale)", line = 2.6)
 abline(v = 1, lty = 3, col = "#00000055")
 legend("bottomright", legend = c("Rwanda", "Placebo country"), fill = c("#DC2626", "#9CA3AF"), border = NA, bty = "n", cex = 0.85)
-mtext("Full Sub-Saharan Africa donor pool, Synth package. Rwanda's gap is not an outlier.", side = 1, line = 5.0, cex = 0.75, col = "#4B5563")
+mtext("Full Sub-Saharan Africa donor pool. Rwanda's gap is not an outlier.", side = 1, line = 5.0, cex = 0.75, col = "#4B5563")
 dev.off()
 cat("Saved figures/placebo-ranking-full-pool.png\n")
 cat(sprintf("Rwanda's rank: %d of %d (p = %.3f)\n", rwanda_rank, n_units, p_value))

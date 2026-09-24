@@ -5,11 +5,11 @@
 # Barro-Lee is five-year-interval and cannot resolve annual timing; WDI
 # enrollment is missing Rwanda 1994-1998 and cannot support a synthetic
 # control. Neither is a substitute for the PWT GDP/hc synthetic controls
-# (code/01-05) -- they are sanity checks on the same qualitative story.
+# (code/01-07) -- they are sanity checks on the same qualitative story.
 #
 # Comparison countries are the donors that already carried the most weight
 # in this project's own synthetic controls (GDP re-estimation, code/02;
-# human-capital extension, code/05), for continuity rather than picking a
+# human-capital extension, code/07), for continuity rather than picking a
 # new comparison set ad hoc.
 
 suppressPackageStartupMessages(library(jsonlite))
@@ -72,7 +72,7 @@ lines <- c(
   "",
   sprintf("**Run date:** %s", format(Sys.Date(), "%d %B %Y")),
   "",
-  "Both checks are descriptive corroboration, not synthetic-control estimates -- per `docs/data-availability.md`, Barro-Lee's five-year frequency cannot resolve annual recovery timing, and WDI enrollment is missing Rwanda 1994-1998 so cannot support a balanced-panel design. Comparison countries are the donors that already carried the most weight in this project's GDP re-estimation (code/02) and human-capital extension (code/05): Cameroon, Senegal, Zambia, Mali, Cote d'Ivoire, Niger, Mozambique, South Africa.",
+  "Both checks are descriptive corroboration, not synthetic-control estimates -- per `docs/data-availability.md`, Barro-Lee's five-year frequency cannot resolve annual recovery timing, and WDI enrollment is missing Rwanda 1994-1998 so cannot support a balanced-panel design. Comparison countries are the donors that already carried the most weight in this project's GDP re-estimation (code/02) and human-capital extension (code/07): Cameroon, Senegal, Zambia, Mali, Cote d'Ivoire, Niger, Mozambique, South Africa.",
   "",
   "## Barro-Lee mean years of schooling (ages 15-64), five-year intervals",
   "",

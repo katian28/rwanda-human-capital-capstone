@@ -1,8 +1,8 @@
-# Placebo tests, 9-country donor pool (Synth package)
+# Placebo tests, 9-country donor pool
 
 **Run date:** 24 September 2026
 
-This is a restricted-pool sensitivity check, not the headline placebo result -- see `results/synth-package-placebo-full-pool.csv` / `code/10` for the full 39-country test. Both in-space and in-time tests here use the actual `Synth` package.
+This is a restricted-pool sensitivity check, not the headline placebo result -- see `results/placebo-full-pool-in-space.csv` / `code/04_placebo_gdp_full_pool.R` for the full 39-country test.
 
 ## In-space placebo
 

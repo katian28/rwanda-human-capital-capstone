@@ -23,7 +23,7 @@ Hodler (2018) uses a synthetic control to estimate that Rwanda's GDP fell by hal
 | Field | Value |
 |---|---|
 | Main folder(s) | Same as GitHub repo |
-| Main writeup | https://docs.google.com/document/d/1rfcZmsbIDTVMKHUgwSRgQcxQ3hbIy-EzslnsNAaxysY/edit |
+| Main writeup | https://docs.google.com/document/d/15UeGget9l9MVlqIxMjWjyux_FVJ8uw_Dc8LUnisihkA/edit |
 | Slide Deck | Not started |
 | GitHub | https://github.com/diamond-minerva-capstone-2026-27/capstone-2026f-katian28 |
 | HC & LO plans | https://docs.google.com/spreadsheets/d/1IcCLJEpCi9l9m042oFADtnfnSfDcS8bkfaM0KWoi8FU/edit (HCs), https://docs.google.com/spreadsheets/d/11V9aZ_VWRKdJXTt4ZXjckxUiO05LV6g-H5MFcrASuF8/edit (LOs) — rows to paste into the official [HC/LO tracking template](https://docs.google.com/spreadsheets/d/1L3pUE3shHDAtweDdz1Ex8-ahqeBHi5wJ10H6Ec7raD8/edit) |
@@ -36,7 +36,7 @@ Hodler (2018) uses a synthetic control to estimate that Rwanda's GDP fell by hal
 
 ## 1-Page Summary
 
-This capstone replicates and extends Hodler's (2018) synthetic-control study of Rwanda's post-genocide GDP recovery. The specific focus is twofold: independently verifying the published GDP result, and testing whether Rwanda's human capital recovered on a comparable trajectory using the same method. The approach is a reproducible R pipeline (`code/01`, `03`, `06-11`) using the `Synth` package as the sole estimation method, covering replication, placebo-based inference at two donor-pool sizes, a human-capital extension, and descriptive robustness checks. The work product is an academic paper. Good success looks like: a GDP replication within a declared tolerance of published benchmarks (`#qualitydeliverables`), placebo-based inference reported honestly even when unfavorable (`#outcomeanalysis`), documented pivots when data proved infeasible (`#navigation`), and a paper that separates core findings from exploratory dead ends (`#curation`).
+This capstone replicates and extends Hodler's (2018) synthetic-control study of Rwanda's post-genocide GDP recovery. The specific focus is twofold: independently verifying the published GDP result, and testing whether Rwanda's human capital recovered on a comparable trajectory using the same method. The approach is a reproducible R pipeline (`code/01-08`) using the `Synth` package as the sole estimation method throughout, covering replication, placebo-based inference at two donor-pool sizes, a human-capital extension, and descriptive robustness checks. The work product is an academic paper. Good success looks like: a GDP replication within a declared tolerance of published benchmarks (`#qualitydeliverables`), placebo-based inference reported honestly even when unfavorable (`#outcomeanalysis`), documented pivots when data proved infeasible (`#navigation`), and a paper that separates core findings from exploratory dead ends (`#curation`).
 
 ## Short summary of completed work
 

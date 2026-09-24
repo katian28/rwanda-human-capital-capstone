@@ -1,10 +1,8 @@
 #!/usr/bin/env Rscript
-# Human-capital extension, using the real Synth package instead of the
-# custom quadratic program in code/05_human_capital_extension.R.
-# Same two steps as the GDP version (code/09 and code/10): first fit
-# Rwanda's synthetic control and look at the gap, then run the same fit
-# for every donor country as a placebo to see how unusual Rwanda's gap
-# really is.
+# Human-capital extension. Same two steps as the GDP version (code/02 and
+# code/04): first fit Rwanda's synthetic control and look at the gap,
+# then run the same fit for every donor country as a placebo to see how
+# unusual Rwanda's gap really is.
 
 library(readxl)  # to read the PWT 8.0 Excel file
 library(Synth)   # the actual synthetic control package
@@ -14,7 +12,7 @@ library(Synth)   # the actual synthetic control package
 pwt <- read_excel("data/raw/pwt80.xlsx", sheet = "Data")
 pwt <- as.data.frame(pwt)
 
-# ---- 2. Build the 27-country donor pool (same screening as code/05) ------
+# ---- 2. Build the 27-country donor pool -----------------------------------
 # Same Sub-Saharan Africa candidate list as the GDP version, but kept only
 # if the country has complete "hc" (human capital index) data, not rgdpe.
 
@@ -81,25 +79,25 @@ synth_main <- synth(dp_main)
 print(synth.tab(synth.res = synth_main, dataprep.res = dp_main))
 
 dir.create("figures", showWarnings = FALSE)
-png("figures/synth-package-hc-path.png", width = 1400, height = 900, res = 150)
+png("figures/hc-extension-path.png", width = 1400, height = 900, res = 150)
 path.plot(
   synth.res = synth_main,
   dataprep.res = dp_main,
   Ylab = "Normalized human capital index (1991-1993 average = 1)",
   Xlab = "Year",
-  Main = "Rwanda human capital: actual vs. synthetic (Synth package)",
+  Main = "Rwanda human capital: actual vs. synthetic",
   Legend = c("Rwanda", "Synthetic Rwanda")
 )
 abline(v = treatment_year, lty = 3, col = "red")
 dev.off()
 
-png("figures/synth-package-hc-gaps.png", width = 1400, height = 900, res = 150)
+png("figures/hc-extension-gaps.png", width = 1400, height = 900, res = 150)
 gaps.plot(
   synth.res = synth_main,
   dataprep.res = dp_main,
   Ylab = "Gap (actual - synthetic)",
   Xlab = "Year",
-  Main = "Rwanda human capital gap (Synth package)"
+  Main = "Rwanda human capital gap"
 )
 abline(v = treatment_year, lty = 3, col = "red")
 dev.off()
@@ -109,10 +107,10 @@ actual_main <- dp_main$Y1plot[, 1]
 synthetic_main <- as.numeric(dp_main$Y0plot %*% synth_main$solution.w)
 path_table <- data.frame(year = first_year:last_year, actual = actual_main, synthetic = synthetic_main)
 path_table$gap <- path_table$actual - path_table$synthetic
-write.csv(path_table, "results/synth-package-hc-path.csv", row.names = FALSE)
+write.csv(path_table, "results/hc-extension-path.csv", row.names = FALSE)
 
-weights_table <- data.frame(donor = donors, synth_weight = round(as.numeric(synth_main$solution.w), 4))
-write.csv(weights_table, "results/synth-package-hc-weights.csv", row.names = FALSE)
+weights_table <- data.frame(donor = donors, weight = round(as.numeric(synth_main$solution.w), 4))
+write.csv(weights_table, "results/hc-extension-weights.csv", row.names = FALSE)
 
 pre_rmspe_main <- sqrt(mean(path_table$gap[path_table$year < treatment_year]^2))
 post_gap_main <- path_table$gap[path_table$year >= treatment_year]
@@ -174,7 +172,7 @@ placebo_results$rank <- seq_len(nrow(placebo_results))
 rwanda_rank <- placebo_results$rank[placebo_results$unit == "RWA"]
 p_value <- rwanda_rank / nrow(placebo_results)
 
-write.csv(placebo_results, "results/synth-package-hc-placebo.csv", row.names = FALSE)
+write.csv(placebo_results, "results/hc-extension-placebo.csv", row.names = FALSE)
 
 cat("\nRwanda's placebo rank:", rwanda_rank, "of", nrow(placebo_results), "\n")
 cat("p-value (rank / total units):", round(p_value, 3), "\n")

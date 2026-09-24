@@ -1,13 +1,13 @@
 #!/usr/bin/env Rscript
-# Full 39-country GDP placebo test, using the real Synth package. This is
-# the headline placebo result for the paper (not the smaller 9-country
-# version in code/03, which is a restricted-pool sensitivity check).
-# Same idea as code/09: treat each country in turn as if IT were hit by
-# the genocide in 1994, fit a synthetic control for it from the other
-# countries, and see how big its "fake" gap is. If Rwanda's real gap is
-# not bigger than most of these fake gaps, that's evidence the gap is not
-# statistically unusual. Section 7 adds an in-time placebo (fake 1985
-# treatment) using the same full donor pool.
+# Full 39-country GDP placebo test. This is the headline placebo result
+# for the paper (not the smaller 9-country version in code/03, which is a
+# restricted-pool sensitivity check). Same idea as code/02: treat each
+# country in turn as if IT were hit by the genocide in 1994, fit a
+# synthetic control for it from the other countries, and see how big its
+# "fake" gap is. If Rwanda's real gap is not bigger than most of these
+# fake gaps, that's evidence the gap is not statistically unusual.
+# Section 7 adds an in-time placebo (fake 1985 treatment) using the same
+# full donor pool.
 
 library(readxl)  # to read the PWT 8.0 Excel file
 library(Synth)   # the actual synthetic control package
@@ -17,7 +17,7 @@ library(Synth)   # the actual synthetic control package
 pwt <- read_excel("data/raw/pwt80.xlsx", sheet = "Data")
 pwt <- as.data.frame(pwt)
 
-# ---- 2. Build the same 39-country donor pool as code/04 -------------------
+# ---- 2. Build the 39-country donor pool -----------------------------------
 # Sub-Saharan Africa, minus Rwanda (treated) and Burundi/DRC/Tanzania/Uganda
 # (excluded for spillover risk -- see docs/replication-feasibility.md),
 # then kept only if it has complete rgdpe data for every year 1970-2011.
@@ -58,7 +58,7 @@ panel$unit_id <- as.numeric(factor(panel$countrycode))  # Synth needs numeric ID
 id_lookup <- unique(panel[, c("countrycode", "unit_id")])  # country code -> number
 
 # ---- 4. One function that fits a synthetic control for ANY treated unit --
-# This is the same dataprep() + synth() recipe as code/09, just wrapped in
+# This is the same dataprep() + synth() recipe as code/02, just wrapped in
 # a function so we can re-use it for all 40 units (Rwanda + 39 donors)
 # without copy-pasting the same code 40 times.
 
@@ -121,7 +121,7 @@ rwanda_rank <- results$rank[results$unit == "RWA"]
 p_value <- rwanda_rank / nrow(results)
 
 dir.create("results", showWarnings = FALSE)
-write.csv(results, "results/synth-package-placebo-full-pool.csv", row.names = FALSE)
+write.csv(results, "results/placebo-full-pool-in-space.csv", row.names = FALSE)
 
 cat("\nRwanda's rank:", rwanda_rank, "of", nrow(results), "\n")
 cat("p-value (rank / total units):", round(p_value, 3), "\n")
@@ -162,7 +162,7 @@ in_time_ratio <- in_time_post_rmspe / in_time_pre_rmspe
 
 write.csv(
   data.frame(year = years, actual = actual_fake, synthetic = synthetic_fake, gap = gap_fake),
-  "results/synth-package-placebo-in-time-full-pool.csv", row.names = FALSE
+  "results/placebo-full-pool-in-time.csv", row.names = FALSE
 )
 cat("\nIn-time placebo (fake 1985 treatment, full pool):\n")
 cat("Pre-1985 RMSPE:", round(in_time_pre_rmspe, 4), "\n")
