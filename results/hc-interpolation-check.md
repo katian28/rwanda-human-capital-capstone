@@ -1,6 +1,8 @@
 # Is PWT hc annual data, or interpolated from Barro-Lee's five-year data?
 
-**Run date:** 24 September 2026
+**Run date:** 25 September 2026
+
+## Check 1: five-year regime shifts
 
 Rwanda's hc year-over-year change, 1971-1993:
 
@@ -31,12 +33,16 @@ Rwanda's hc year-over-year change, 1971-1993:
 | 1992 | 1.369618 | 0.017289 |
 | 1993 | 1.387128 | 0.017510 |
 
-## Finding
+The same pattern (nearly constant within each five-year block, distinct shift at each five-year boundary) holds for Cameroon, Zambia, Mali, and Senegal as well -- see `results/hc-interpolation-check.csv` for all five countries. This is not a Rwanda-specific artifact.
 
-The yearly change is nearly constant within each five-year block (1971-1975, 1976-1980, 1981-1985, 1986-1990, 1991-1993), and shifts distinctly at each five-year boundary -- exactly Barro-Lee's observation grid. This confirms PWT's hc is a deterministic transform of Barro-Lee schooling data, interpolated between five-year points, not genuinely annual information.
+## Check 2: the 2010-2011 boundary
 
-## Why this matters for code/07 (human-capital extension)
+hc is IDENTICAL between 2010 and 2011 for every country checked (RWA, CMR, ZMB, MLI, SEN): the 2011 value is the 2010 value carried forward, not real data. For comparison, Rwanda's rgdpe changes normally over the same years (12056.90 in 2010, 13147.93 in 2011) -- this freeze is specific to hc, not a general PWT-vintage issue.
+
+## Why this matters
 
 A 24-year pre-treatment window (1970-1993) is effectively ~5 real data points per country, not 24 independent ones, since every donor country's hc is built the same way. Fitting a weighted average of 27 donor countries to match a series with that few real degrees of freedom is close to guaranteed to look near-perfect almost regardless of which country is treated -- consistent with 5 of the 27 donors showing an even tighter pre-treatment fit than Rwanda (see code/07 placebo output).
 
-This does not necessarily invalidate the human-capital placebo result (in-space ranking partially self-corrects, since every unit's pre-treatment fit is inflated the same mechanical way), but it does mean a tight pre-treatment fit on hc does not validate the counterfactual the way Abadie's method assumes for a genuinely high-frequency outcome. The post-treatment gap itself may also be partly shaped by how the interpolation behaved for a country with disrupted underlying data during the study period, not by a real annual human-capital trajectory.
+The 2010-2011 freeze also means the apparent 'plateau' in the post-treatment gap (figures/hc-extension-gaps.png) is partly mechanical: the 2011 data point adds no independent information over 2010, for Rwanda or any donor. The post-treatment RMSPE in code/07 effectively double-counts the 2010 gap once.
+
+This does not necessarily invalidate the human-capital placebo result (in-space ranking partially self-corrects, since every unit's pre-treatment fit is inflated the same mechanical way), but it does mean a tight pre-treatment fit on hc does not validate the counterfactual the way Abadie's method assumes for a genuinely high-frequency outcome, and the true post-treatment window is closer to 17 informative years than 18.

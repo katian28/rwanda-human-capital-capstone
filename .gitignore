@@ -45,6 +45,7 @@ results/*
 !results/robustness-checks.md
 !results/hc-interpolation-check.csv
 !results/hc-interpolation-check.md
+!results/hc-2010-2011-freeze-check.csv
 
 # Node and dependencies
 node_modules/
