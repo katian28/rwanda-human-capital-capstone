@@ -1,6 +1,6 @@
 # Placebo tests, 9-country donor pool
 
-**Run date:** 24 September 2026
+**Run date:** 28 September 2026
 
 This is a restricted-pool sensitivity check, not the headline placebo result -- see `results/placebo-full-pool-in-space.csv` / `code/04_placebo_gdp_full_pool.R` for the full 39-country test.
 
@@ -8,21 +8,21 @@ This is a restricted-pool sensitivity check, not the headline placebo result -- 
 
 | Rank | Unit | Pre-RMSPE | Post-RMSPE | Ratio |
 |------|------|-----------|------------|-------|
-| 1 | SDN | 0.0508 | 0.8160 | 16.06 |
-| 2 | RWA | 0.0458 | 0.3382 | 7.38 |
-| 3 | SEN | 0.0757 | 0.3060 | 4.04 |
-| 4 | CMR | 0.0593 | 0.1640 | 2.77 |
-| 5 | MLI | 0.1061 | 0.2845 | 2.68 |
-| 6 | COG | 0.1467 | 0.3485 | 2.38 |
-| 7 | LSO | 0.1010 | 0.2257 | 2.24 |
-| 8 | NER | 0.1310 | 0.2741 | 2.09 |
-| 9 | GAB | 0.1328 | 0.2579 | 1.94 |
+| 1 | SDN | 0.0534 | 0.8255 | 15.47 |
+| 2 | SEN | 0.0692 | 0.6055 | 8.75 |
+| 3 | RWA | 0.0555 | 0.3210 | 5.78 |
+| 4 | CMR | 0.0585 | 0.1964 | 3.36 |
+| 5 | MLI | 0.1059 | 0.2941 | 2.78 |
+| 6 | NER | 0.1273 | 0.3208 | 2.52 |
+| 7 | COG | 0.1467 | 0.3486 | 2.38 |
+| 8 | GAB | 0.1286 | 0.2539 | 1.97 |
+| 9 | LSO | 0.1060 | 0.1740 | 1.64 |
 | 10 | LBR | 2.3249 | 0.6422 | 0.28 |
 
-**Rwanda's rank: 2 of 10 (p = 0.200).**
+**Rwanda's rank: 3 of 10 (p = 0.300).**
 
 ## In-time placebo (fake treatment year: 1985)
 
-- Pre-1985 RMSPE: 0.0347
-- 1985-1993 (placebo post) RMSPE: 0.0817
-- Ratio: 2.36
+- Pre-1985 RMSPE: 0.0509
+- 1985-1993 (placebo post) RMSPE: 0.0688
+- Ratio: 1.35

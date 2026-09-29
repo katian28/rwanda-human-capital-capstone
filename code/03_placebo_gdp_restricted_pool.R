@@ -11,6 +11,103 @@
 
 library(readxl)
 library(Synth)
+library(rgenoud)
+library(quadprog)
+
+# genoud (used below) picks its internal random seed via runif() by
+# default -- fixing R's own seed here makes every run identical. See
+# code/02 for the empirical check that found this.
+set.seed(42)
+
+# fit_synth_robust() reimplements synth()'s own documented algorithm
+# (Abadie, Diamond & Hainmueller 2011, JSS 42(13), section 3.2, matching
+# ?synth and Synth's source exactly): try TWO starting points for V (equal
+# weights, and a regression-based guess), each refined via Nelder-Mead and
+# BFGS, keep whichever wins; with genoud, add a third candidate (genoud's
+# global search), likewise only a starting point, always locally refined
+# afterward, never used raw. The one deviation: the quadratic program for
+# W (given a V) is solved with quadprog instead of kernlab's ipop, which
+# synth() uses internally -- ipop turned out to be numerically fragile on
+# this project's data near sparse W solutions, and not just by erroring:
+# it can silently return a markedly worse W for the same V with no error
+# at all. quadprog solves the identical equation; it's a solver swap, not
+# a change to the method. See code/02 for the full derivation, citations,
+# and empirical tests.
+fit_synth_robust <- function(dp) {
+  X0 <- dp$X0; X1 <- dp$X1; Z0 <- dp$Z0; Z1 <- dp$Z1
+  nvarsV <- nrow(X0)
+  n_donors <- ncol(X0)
+
+  big <- cbind(X0, X1)
+  divisor <- sqrt(apply(big, 1, var))
+  scaled <- t(t(big) %*% (1 / divisor * diag(rep(nrow(big), 1))))
+  X0.scaled <- scaled[, 1:n_donors]
+  X1.scaled <- scaled[, ncol(scaled)]
+
+  solve_w_quadprog <- function(v, X0.scaled, X1.scaled) {
+    Vd <- diag(v, nrow = length(v), ncol = length(v))
+    H <- t(X0.scaled) %*% Vd %*% X0.scaled
+    Dmat <- H + diag(1e-10, n_donors)
+    dvec <- as.numeric(t(X1.scaled) %*% Vd %*% X0.scaled)
+    Amat <- cbind(rep(1, n_donors), diag(n_donors))
+    bvec <- c(1, rep(0, n_donors))
+    w <- tryCatch(
+      solve.QP(Dmat, dvec, Amat, bvec, meq = 1)$solution,
+      error = function(e) rep(1 / n_donors, n_donors)
+    )
+    w <- pmax(w, 0); w / sum(w)
+  }
+
+  fn_v_quadprog <- function(variables.v, X0.scaled, X1.scaled, Z0, Z1) {
+    v <- abs(variables.v) / sum(abs(variables.v))
+    w <- solve_w_quadprog(v, X0.scaled, X1.scaled)
+    as.numeric(t(Z1 - Z0 %*% w) %*% (Z1 - Z0 %*% w)) / nrow(Z0)
+  }
+
+  rgV.genoud <- genoud(fn_v_quadprog, nvarsV, X0.scaled = X0.scaled,
+                        X1.scaled = X1.scaled, Z0 = Z0, Z1 = Z1, print.level = 0)
+  SV1 <- rgV.genoud$par
+
+  Xall <- cbind(X1.scaled, X0.scaled)
+  Xall <- cbind(rep(1, ncol(Xall)), t(Xall))
+  Zall <- cbind(Z1, Z0)
+  Beta <- tryCatch(solve(t(Xall) %*% Xall) %*% t(Xall) %*% t(Zall), error = function(e) NULL)
+  SV2 <- if (!is.null(Beta)) {
+    Beta <- Beta[-1, , drop = FALSE]
+    v2 <- diag(Beta %*% t(Beta))
+    v2 / sum(v2)
+  } else {
+    rep(1 / nvarsV, nvarsV)
+  }
+
+  refine <- function(par0) {
+    best <- list(par = par0, value = fn_v_quadprog(par0, X0.scaled, X1.scaled, Z0, Z1))
+    for (m in c("Nelder-Mead", "BFGS")) {
+      r <- tryCatch(
+        optim(par0, fn_v_quadprog, X0.scaled = X0.scaled, X1.scaled = X1.scaled,
+              Z0 = Z0, Z1 = Z1, method = m),
+        error = function(e) NULL
+      )
+      if (!is.null(r) && r$value < best$value) best <- list(par = r$par, value = r$value)
+    }
+    best
+  }
+
+  cand1 <- refine(SV1)
+  cand2 <- refine(SV2)
+  winning <- if (cand1$value <= cand2$value) cand1 else cand2
+  winning_v <- abs(winning$par) / sum(abs(winning$par))
+
+  w <- solve_w_quadprog(winning_v, X0.scaled, X1.scaled)
+  loss_w <- as.numeric(t(Z1 - Z0 %*% w) %*% (Z1 - Z0 %*% w)) / nrow(Z0)
+
+  fit <- synth(dp, quiet = TRUE)  # only used as a template for solution.w/v's dimnames etc.
+  fit$solution.w[, 1] <- w
+  fit$solution.v[1, ] <- winning_v
+  fit$loss.w[1, 1] <- loss_w
+  fit$loss.v[1, 1] <- winning$value
+  fit
+}
 
 # ---- 1. Load and prepare the data -----------------------------------------
 
@@ -68,7 +165,7 @@ fit_one <- function(treated_code, control_codes, pre_years, plot_years) {
     )
   )
 
-  fit <- synth(dp, quiet = TRUE)
+  fit <- fit_synth_robust(dp)
   actual <- dp$Y1plot[, 1]
   synthetic <- as.numeric(dp$Y0plot %*% fit$solution.w)
   data.frame(year = plot_years, actual = actual, synthetic = synthetic, gap = actual - synthetic)

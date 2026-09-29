@@ -46,6 +46,15 @@ results/*
 !results/hc-interpolation-check.csv
 !results/hc-interpolation-check.md
 !results/hc-2010-2011-freeze-check.csv
+!results/hc-true-frequency-check.csv
+!results/hc-true-frequency-check.md
+!results/hc-true-frequency-path.csv
+!results/immunization-feasibility-check.md
+
+# Private paper-writing orchestration -- not for the shared/advisor repo
+.claude/skills/write-replication/
+docs/paper-facts-replication.md
+writing/
 
 # Node and dependencies
 node_modules/

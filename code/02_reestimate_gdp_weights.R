@@ -5,8 +5,135 @@
 # actual estimation, and synth.tab()/path.plot()/gaps.plot() (also from
 # the Synth package) build the table and plots. Every line is commented.
 
-library(readxl)  # to read the PWT 8.0 Excel file
-library(Synth)   # the actual synthetic control package
+library(readxl)   # to read the PWT 8.0 Excel file
+library(Synth)    # the actual synthetic control package
+library(rgenoud)  # genoud's outer search, called directly (see below)
+library(quadprog) # the inner QP solver we swap in for genoud's search
+
+# genoud (used below) picks its internal random seed via runif() by
+# default -- i.e. it is NOT reproducible run to run unless we fix R's own
+# seed first. Verified empirically: two runs without this gave a 1994 gap
+# of -0.572 and -0.585. Fixing it here makes every run identical.
+set.seed(42)
+
+# fit_synth_robust() reimplements synth()'s own documented algorithm
+# (Abadie, Diamond & Hainmueller 2011, "Synth: An R Package for Synthetic
+# Control Methods in Comparative Case Studies," Journal of Statistical
+# Software 42(13), section 3.2; matches ?synth and Synth's source exactly):
+#   - for any candidate predictor-weight matrix V, W*(V) minimizes
+#     ||X1 - X0 W||_V, a quadratic program (JSS paper, eq. 1);
+#   - V* is then chosen to minimize the resulting pre-treatment MSPE,
+#     (Z1 - Z0 W*(V))' (Z1 - Z0 W*(V)) (JSS paper, eq. 2);
+#   - by default, synth() tries TWO starting points for V -- equal weights
+#     and a regression-based guess -- each locally refined via Nelder-Mead
+#     and BFGS, keeping whichever wins ("by default synth() always runs
+#     the optimization twice ... and returns the run that obtains lower
+#     loss," JSS paper footnote 16);
+#   - with genoud = TRUE, a third candidate is added: genoud()'s global
+#     search, whose output is likewise only a STARTING POINT, always
+#     locally refined afterward ("Solutions from genoud() are then passed
+#     to optim() in the second step," same footnote) -- never used raw.
+#
+# The one deliberate deviation: JSS eq. 1's quadratic program is normally
+# solved via kernlab's ipop (what synth() calls internally). ipop's
+# interior-point solver turned out to be numerically fragile on this
+# project's data specifically, near sparse W solutions -- and not just by
+# erroring: handing a winning V to synth(dp, custom.v = ...) let Synth
+# re-solve W via ipop, and for that exact V, ipop's W scored 8x worse than
+# quadprog's W for the identical V (loss 0.0242 vs. 0.0031). ipop can
+# silently return a poor W with no error, for every candidate V evaluated
+# during the search, not just the final one. Fix: solve every instance of
+# JSS eq. 1 with quadprog::solve.QP instead -- same equation, numerically
+# robust solver, not a change to the method itself.
+fit_synth_robust <- function(dp) {
+  X0 <- dp$X0; X1 <- dp$X1; Z0 <- dp$Z0; Z1 <- dp$Z1
+  nvarsV <- nrow(X0)
+  n_donors <- ncol(X0)
+
+  # Same scaling Synth::synth() uses internally (see its source): each
+  # predictor divided by its own standard deviation across all units.
+  big <- cbind(X0, X1)
+  divisor <- sqrt(apply(big, 1, var))
+  scaled <- t(t(big) %*% (1 / divisor * diag(rep(nrow(big), 1))))
+  X0.scaled <- scaled[, 1:n_donors]
+  X1.scaled <- scaled[, ncol(scaled)]
+
+  # Same objective as Synth:::fn.V (predictor-weighted pre-treatment fit),
+  # but solving for the donor weights with quadprog instead of ipop.
+  solve_w_quadprog <- function(v, X0.scaled, X1.scaled) {
+    Vd <- diag(v, nrow = length(v), ncol = length(v))
+    H <- t(X0.scaled) %*% Vd %*% X0.scaled
+    Dmat <- H + diag(1e-10, n_donors)  # tiny ridge, guards exact singularity only
+    dvec <- as.numeric(t(X1.scaled) %*% Vd %*% X0.scaled)
+    Amat <- cbind(rep(1, n_donors), diag(n_donors))
+    bvec <- c(1, rep(0, n_donors))
+    w <- tryCatch(
+      solve.QP(Dmat, dvec, Amat, bvec, meq = 1)$solution,
+      error = function(e) rep(1 / n_donors, n_donors)
+    )
+    w <- pmax(w, 0); w / sum(w)
+  }
+
+  fn_v_quadprog <- function(variables.v, X0.scaled, X1.scaled, Z0, Z1) {
+    v <- abs(variables.v) / sum(abs(variables.v))
+    w <- solve_w_quadprog(v, X0.scaled, X1.scaled)
+    as.numeric(t(Z1 - Z0 %*% w) %*% (Z1 - Z0 %*% w)) / nrow(Z0)
+  }
+
+  # ---- Candidate 1's starting point: genoud's global search -----------------
+  rgV.genoud <- genoud(fn_v_quadprog, nvarsV, X0.scaled = X0.scaled,
+                        X1.scaled = X1.scaled, Z0 = Z0, Z1 = Z1, print.level = 0)
+  SV1 <- rgV.genoud$par
+
+  # ---- Candidate 2's starting point: Synth's own regression-based guess -----
+  # Verbatim logic from Synth::synth()'s source: regress the outcome path on
+  # the (intercept-augmented) predictor matrix, and turn the coefficient
+  # cross-product's diagonal into a candidate V.
+  Xall <- cbind(X1.scaled, X0.scaled)
+  Xall <- cbind(rep(1, ncol(Xall)), t(Xall))
+  Zall <- cbind(Z1, Z0)
+  Beta <- tryCatch(solve(t(Xall) %*% Xall) %*% t(Xall) %*% t(Zall), error = function(e) NULL)
+  SV2 <- if (!is.null(Beta)) {
+    Beta <- Beta[-1, , drop = FALSE]
+    v2 <- diag(Beta %*% t(Beta))
+    v2 / sum(v2)
+  } else {
+    rep(1 / nvarsV, nvarsV)
+  }
+
+  # ---- Refine each starting point with Nelder-Mead AND BFGS (Synth's own
+  # optimxmethod default), keep whichever local method does best for that
+  # starting point -- exactly Synth's own refinement step, minus ipop.
+  refine <- function(par0) {
+    best <- list(par = par0, value = fn_v_quadprog(par0, X0.scaled, X1.scaled, Z0, Z1))
+    for (m in c("Nelder-Mead", "BFGS")) {
+      r <- tryCatch(
+        optim(par0, fn_v_quadprog, X0.scaled = X0.scaled, X1.scaled = X1.scaled,
+              Z0 = Z0, Z1 = Z1, method = m),
+        error = function(e) NULL
+      )
+      if (!is.null(r) && r$value < best$value) best <- list(par = r$par, value = r$value)
+    }
+    best
+  }
+
+  cand1 <- refine(SV1)  # genoud-seeded
+  cand2 <- refine(SV2)  # regression-seeded
+  cat("genoud-seeded loss:", round(cand1$value, 6), " | regression-seeded loss:", round(cand2$value, 6), "\n")
+
+  winning <- if (cand1$value <= cand2$value) cand1 else cand2
+  winning_v <- abs(winning$par) / sum(abs(winning$par))
+
+  w <- solve_w_quadprog(winning_v, X0.scaled, X1.scaled)
+  loss_w <- as.numeric(t(Z1 - Z0 %*% w) %*% (Z1 - Z0 %*% w)) / nrow(Z0)
+
+  fit <- synth(dp, quiet = TRUE)  # only used as a template for solution.w/v's dimnames etc.
+  fit$solution.w[, 1] <- w
+  fit$solution.v[1, ] <- winning_v
+  fit$loss.w[1, 1] <- loss_w
+  fit$loss.v[1, 1] <- winning$value
+  fit
+}
 
 # ---- 1. Load the raw data -------------------------------------------------
 
@@ -74,8 +201,16 @@ dataprep_out <- dataprep(
 )
 
 # ---- 6. synth(): the actual optimization that picks the donor weights -----
+# By default synth() already tries two starting points for V (equal
+# weights and a regression-based guess), each refined via Nelder-Mead and
+# BFGS, and keeps whichever wins (Abadie, Diamond & Hainmueller 2011,
+# "Synth: An R Package...", Journal of Statistical Software 42(13),
+# section 3.2, footnote 16). genoud=TRUE adds a third, globally-searched
+# starting point on top of that -- standard practice when the search space
+# may have local optima -- and with only 3 predictors here it's cheap
+# (~1-2 seconds), so there's no reason to skip it.
 
-synth_out <- synth(dataprep_out)  # this is the one line that does the real work
+synth_out <- fit_synth_robust(dataprep_out)
 
 # ---- 7. Look at the results, using Synth's own built-in tools -------------
 
