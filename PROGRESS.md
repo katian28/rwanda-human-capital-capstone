@@ -2,6 +2,11 @@
 
 Add a new entry before each meeting. Newest at the top. Three lines is enough.
 
+## 2026-10-01
+- **Done:** Fixed a real numerical bug in how `Synth`'s genoud optimizer was being used (silently returned suboptimal donor weights near sparse solutions); re-ran the full pipeline with a verified-faithful reimplementation of `synth()`'s actual documented algorithm. Headline full-pool GDP placebo moved to its honest, final value: rank 31/40 (p=0.775). Diagnosed `hc` as unusable at any frequency (fabricated annual resolution, confirmed by PWT's own methodology docs); surveyed and rejected fertility/infant mortality and government spending as replacements; confirmed immunization coverage (DTP3) passes the balanced-panel screen and reframed the extension around public-health service-delivery recovery. Drafted the replication and background sections of the paper.
+- **Next:** Build the immunization-coverage synthetic control and placebo test (mirrors code/07's structure); draft the extension section once those results exist.
+- **Blocked:** None currently.
+
 ## 2026-09-23
 - **Done:** Independently re-estimated GDP donor weights and re-ran all placebo tests (9-country, full 39-country, in-time) using the actual `Synth` package (Abadie, Diamond & Hainmueller), not just a hand-rolled fit; GDP placebo confirmed weak (p=0.53). Tested Hodler's own placebo-exclusion rule — does not change the GDP result. Rebuilt the human-capital extension with `Synth`; its placebo result improved to p=0.071, clearing the 10% threshold. Built the human-capital extension, Barro-Lee/WDI robustness checks, and traced the WDI 1994-1998 gap to genuine administrative collapse via MINEDUC records. Assembled the Week 3 Project Brief, HC/LO tracker, and committee list.
 - **Next:** In-time placebo for the human-capital extension via `Synth`; full predictor-set re-estimation (PWT 7.1, WDI inflation, Polity IV, Freedom House, UCDP) as a robustness check; finalize committee and advisor sign-off on framing (replicated path vs. weak GDP significance).
