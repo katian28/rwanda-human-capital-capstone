@@ -50,6 +50,16 @@ results/*
 !results/hc-true-frequency-check.md
 !results/hc-true-frequency-path.csv
 !results/immunization-feasibility-check.md
+!figures/immunization-extension-path.png
+!figures/immunization-extension-gaps.png
+!results/immunization-extension-path.csv
+!results/immunization-extension-weights.csv
+!results/immunization-extension-placebo.csv
+!results/immunization-extension-summary.md
+!figures/immunization-no-somalia-path.png
+!results/immunization-no-somalia-path.csv
+!results/immunization-no-somalia-weights.csv
+!results/immunization-no-somalia-placebo.csv
 
 # Private paper-writing orchestration -- not for the shared/advisor repo
 .claude/skills/write-replication/
