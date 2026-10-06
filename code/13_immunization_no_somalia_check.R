@@ -132,17 +132,15 @@ complete_years <- tapply(!is.na(coverage[[outcome_var]]), coverage$countrycode, 
 donors <- names(complete_years)[complete_years == length(first_year:last_year)]
 cat(length(donors), "donors have complete DTP3 coverage (Somalia excluded),", first_year, "-", last_year, "\n")
 
-# ---- 3. Build and normalize the panel (Rwanda + all donors) ---------------
+# ---- 3. Build the panel (Rwanda + all donors) ------------------------------
+# NOT normalized -- see code/12 for why: DTP3 is already a common 0-100%
+# scale across countries, and dividing a bounded percentage by its own
+# baseline creates a ceiling/floor asymmetry that plausibly contributed to
+# Somalia's outsized weight in the normalized version in the first place.
 
 panel <- dtp3[dtp3$countrycode %in% c("RWA", donors) & dtp3$year %in% first_year:last_year,
               c("countrycode", "year", outcome_var)]
 names(panel)[3] <- "coverage"
-
-for (country in unique(panel$countrycode)) {
-  is_this_country <- panel$countrycode == country
-  baseline <- mean(panel$coverage[is_this_country & panel$year %in% 1991:1993])
-  panel$coverage[is_this_country] <- panel$coverage[is_this_country] / baseline
-}
 
 panel$unit_id <- as.numeric(factor(panel$countrycode))
 id_lookup <- unique(panel[, c("countrycode", "unit_id")])
@@ -179,7 +177,7 @@ png("figures/immunization-no-somalia-path.png", width = 1400, height = 900, res 
 path.plot(
   synth.res = synth_main,
   dataprep.res = dp_main,
-  Ylab = "Normalized DTP3 immunization coverage (1991-1993 average = 1)",
+  Ylab = "DTP3 immunization coverage (%)",
   Xlab = "Year",
   Main = "Rwanda immunization coverage: actual vs. synthetic (Somalia excluded)",
   Legend = c("Rwanda", "Synthetic Rwanda")

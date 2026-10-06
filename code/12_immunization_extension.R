@@ -146,17 +146,20 @@ complete_years <- tapply(!is.na(coverage[[outcome_var]]), coverage$countrycode, 
 donors <- names(complete_years)[complete_years == length(first_year:last_year)]
 cat(length(donors), "donors have complete DTP3 coverage,", first_year, "-", last_year, "\n")
 
-# ---- 3. Build and normalize the panel (Rwanda + all donors) ---------------
+# ---- 3. Build the panel (Rwanda + all donors) ------------------------------
+# NOT normalized to a baseline, unlike code/02 (GDP) and code/07 (hc). DTP3
+# is already a percentage on a common 0-100 scale across every country, so
+# it doesn't need normalizing to be comparable the way GDP levels do.
+# Dividing a BOUNDED percentage by its own baseline is actively distorting:
+# a country starting near 90% coverage has almost no room to rise above 1.0
+# (ceiling effect), while a low-baseline country has enormous room to swing
+# far above 1.0 from a modest percentage-point gain -- plausibly part of why
+# Somalia (baseline ~21%) dominated the synthetic control's weights in the
+# normalized version. Raw percentage-point levels avoid this asymmetry.
 
 panel <- dtp3[dtp3$countrycode %in% c("RWA", donors) & dtp3$year %in% first_year:last_year,
               c("countrycode", "year", outcome_var)]
 names(panel)[3] <- "coverage"
-
-for (country in unique(panel$countrycode)) {
-  is_this_country <- panel$countrycode == country
-  baseline <- mean(panel$coverage[is_this_country & panel$year %in% 1991:1993])
-  panel$coverage[is_this_country] <- panel$coverage[is_this_country] / baseline
-}
 
 panel$unit_id <- as.numeric(factor(panel$countrycode))
 id_lookup <- unique(panel[, c("countrycode", "unit_id")])
@@ -180,7 +183,7 @@ dp_main <- dataprep(
   time.predictors.prior = first_year:(treatment_year - 1),
   time.optimize.ssr = first_year:(treatment_year - 1),
   time.plot = first_year:last_year,
-  special.predictors = list(
+  special.predictors = list( #find more predictors like 3-5
     list("coverage", 1981:1985, "mean"),
     list("coverage", 1986:1989, "mean"),
     list("coverage", 1990:1993, "mean")
@@ -196,7 +199,7 @@ png("figures/immunization-extension-path.png", width = 1400, height = 900, res =
 path.plot(
   synth.res = synth_main,
   dataprep.res = dp_main,
-  Ylab = "Normalized DTP3 immunization coverage (1991-1993 average = 1)",
+  Ylab = "DTP3 immunization coverage (%)",
   Xlab = "Year",
   Main = "Rwanda immunization coverage: actual vs. synthetic",
   Legend = c("Rwanda", "Synthetic Rwanda")
@@ -208,7 +211,7 @@ png("figures/immunization-extension-gaps.png", width = 1400, height = 900, res =
 gaps.plot(
   synth.res = synth_main,
   dataprep.res = dp_main,
-  Ylab = "Gap (actual - synthetic)",
+  Ylab = "Gap (actual - synthetic, percentage points)",
   Xlab = "Year",
   Main = "Rwanda immunization coverage gap"
 )

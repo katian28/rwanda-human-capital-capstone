@@ -63,7 +63,8 @@ results/*
 
 # Private paper-writing orchestration -- not for the shared/advisor repo
 .claude/skills/write-replication/
-docs/paper-facts-replication.md
+.claude/skills/write-extension/
+docs/paper-facts-*.md
 writing/
 
 # Node and dependencies
