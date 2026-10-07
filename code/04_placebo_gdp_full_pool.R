@@ -1,22 +1,33 @@
 #!/usr/bin/env Rscript
-# Full 39-country GDP placebo test. This is the headline placebo result
-# for the paper (not the smaller 9-country version in code/03, which is a
+# Full-pool GDP placebo test. This is the headline placebo result for the
+# paper (not the smaller 9-country version in code/03, which is a
 # restricted-pool sensitivity check). Same idea as code/02: treat each
 # country in turn as if IT were hit by the genocide in 1994, fit a
 # synthetic control for it from the other countries, and see how big its
 # "fake" gap is. If Rwanda's real gap is not bigger than most of these
 # fake gaps, that's evidence the gap is not statistically unusual.
+#
+# Uses Hodler's actual predictor set (PWT 7.1 investment/openness, WDI
+# inflation, Polity, Freedom House, UCDP conflict), not the earlier
+# simplified GDP-only special predictors. This genuinely shrinks the
+# usable donor pool -- from 39 countries (GDP-only completeness) down to
+# the ~29 with at least one real observation of every predictor in the
+# window (verified in code/14_predictor_assembly_check.R; dataprep()
+# itself handles any remaining partial-year gaps via na.rm=TRUE, verified
+# directly against its own source behavior, not assumed). A smaller but
+# fully predictor-complete pool is the more defensible headline test than
+# a larger pool built on a predictor set we know is missing for many of
+# its members.
+#
 # Section 7 adds an in-time placebo (fake 1985 treatment) using the same
-# full donor pool.
+# pool, with simpler GDP-only predictors -- see code/03's header comment
+# for why (UCDP conflict data doesn't exist before 1989).
 
-library(readxl)   # to read the PWT 8.0 Excel file
-library(Synth)    # the actual synthetic control package
-library(rgenoud)  # genoud's outer search, called directly (see below)
-library(quadprog) # the inner QP solver we swap in for genoud's search
+library(readxl)
+library(Synth)
+library(rgenoud)
+library(quadprog)
 
-# genoud (used below) picks its internal random seed via runif() by
-# default -- fixing R's own seed here makes every run identical. See
-# code/02 for the empirical check that found this.
 set.seed(42)
 
 # fit_synth_robust() reimplements synth()'s own documented algorithm
@@ -109,55 +120,150 @@ fit_synth_robust <- function(dp) {
   fit
 }
 
-# ---- 1. Load the raw data -------------------------------------------------
-
-pwt <- read_excel("data/raw/pwt80.xlsx", sheet = "Data")
-pwt <- as.data.frame(pwt)
-
-# ---- 2. Build the 39-country donor pool -----------------------------------
-# Sub-Saharan Africa, minus Rwanda (treated) and Burundi/DRC/Tanzania/Uganda
-# (excluded for spillover risk -- see docs/replication-feasibility.md),
-# then kept only if it has complete rgdpe data for every year 1970-2011.
-
-ssa_all <- c(
-  "AGO", "BEN", "BWA", "BFA", "BDI", "CPV", "CMR", "CAF", "TCD", "COM",
-  "COD", "COG", "CIV", "GNQ", "ERI", "SWZ", "ETH", "GAB", "GMB", "GHA",
-  "GIN", "GNB", "KEN", "LSO", "LBR", "MDG", "MWI", "MLI", "MRT", "MUS",
-  "MOZ", "NAM", "NER", "NGA", "RWA", "STP", "SEN", "SYC", "SLE", "SOM",
-  "ZAF", "SSD", "SDN", "TZA", "TGO", "UGA", "ZMB", "ZWE"
-)
-excluded <- c("BDI", "COD", "TZA", "UGA")
-candidates <- setdiff(ssa_all, c("RWA", excluded))
-
 treatment_year <- 1994
 first_year <- 1970
 last_year <- 2011
-outcome_var <- "rgdpe"
+pre_window <- 1985:1990
+conflict_window <- 1991:1993
 
-coverage <- pwt[pwt$countrycode %in% candidates & pwt$year %in% first_year:last_year, ]
-complete_years <- tapply(!is.na(coverage[[outcome_var]]), coverage$countrycode, sum)
-donors <- names(complete_years)[complete_years == length(first_year:last_year)]
-cat(length(donors), "donors have complete rgdpe coverage\n")
+# 29-country pool: Sub-Saharan Africa minus Rwanda and the spillover-risk
+# neighbors (Burundi, DR Congo, Tanzania, Uganda -- see docs/replication-
+# feasibility.md), further restricted to countries with at least one real
+# observation of EVERY Hodler predictor in its window (verified in
+# code/14_predictor_assembly_check.R's "lenient" check -- dataprep()
+# itself averages over whatever years are actually present via its own
+# na.rm=TRUE handling, confirmed directly against Synth's source, not
+# assumed).
+donors <- c("BWA", "BFA", "CPV", "CMR", "CAF", "TCD", "COG", "CIV", "GNQ",
+            "SWZ", "ETH", "GAB", "GMB", "GHA", "GNB", "KEN", "LSO", "MDG",
+            "MWI", "MLI", "MRT", "MUS", "NER", "NGA", "SEN", "ZAF", "SDN",
+            "TGO", "ZMB")
 
-# ---- 3. Build and normalize the panel (Rwanda + all donors) ---------------
+# ---- 1. Load and merge Hodler's full predictor set -------------------------
+# Identical sourcing/merge logic to code/02 -- see there for full comments
+# on each source and the two real data-mapping bugs found while verifying
+# them (Polity's scode is not ISO3; Freedom House's pre-1990 editions need
+# the label's second year, not the "Year(s) Under Review" field).
 
-panel <- pwt[pwt$countrycode %in% c("RWA", donors) & pwt$year %in% first_year:last_year,
-             c("countrycode", "year", outcome_var)]
-names(panel)[3] <- "gdp"
-
-for (country in unique(panel$countrycode)) {
-  is_this_country <- panel$countrycode == country
-  baseline <- mean(panel$gdp[is_this_country & panel$year %in% 1991:1993])
-  panel$gdp[is_this_country] <- panel$gdp[is_this_country] / baseline
+pwt80 <- as.data.frame(read_excel("data/raw/pwt80.xlsx", sheet = "Data"))
+gdp <- pwt80[pwt80$countrycode %in% c("RWA", donors) & pwt80$year %in% first_year:last_year,
+             c("countrycode", "year", "rgdpe")]
+names(gdp)[3] <- "gdp"
+for (c_ in unique(gdp$countrycode)) {
+  m <- gdp$countrycode == c_
+  baseline <- mean(gdp$gdp[m & gdp$year %in% 1991:1993])
+  gdp$gdp[m] <- gdp$gdp[m] / baseline
 }
 
-panel$unit_id <- as.numeric(factor(panel$countrycode))  # Synth needs numeric IDs
-id_lookup <- unique(panel[, c("countrycode", "unit_id")])  # country code -> number
+pwt71 <- read.csv("data/raw/pwt71.csv", stringsAsFactors = FALSE)
+invest_open <- pwt71[pwt71$isocode %in% c("RWA", donors) & pwt71$year %in% pre_window,
+                      c("isocode", "year", "ki", "openk")]
+names(invest_open)[1] <- "countrycode"
 
-# ---- 4. One function that fits a synthetic control for ANY treated unit --
-# This is the same dataprep() + synth() recipe as code/02, just wrapped in
-# a function so we can re-use it for all 40 units (Rwanda + 39 donors)
-# without copy-pasting the same code 40 times.
+wdi <- read.csv("data/raw/wdi_inflation.csv", stringsAsFactors = FALSE)
+inflation <- wdi[wdi$countrycode %in% c("RWA", donors) & wdi$year %in% pre_window,
+                  c("countrycode", "year", "inflation_cpi_pct")]
+
+polity_raw <- as.data.frame(read_excel("data/raw/polity.xls"))
+scode_to_iso3 <- c(
+  RWA = "RWA", BOT = "BWA", BFO = "BFA", CAP = "CPV", CAO = "CMR",
+  CEN = "CAF", CHA = "TCD", CON = "COG", IVO = "CIV", EQG = "GNQ",
+  SWA = "SWZ", ETH = "ETH", GAB = "GAB", GAM = "GMB", GHA = "GHA",
+  GNB = "GNB", KEN = "KEN", LES = "LSO", MAG = "MDG", MAW = "MWI",
+  MLI = "MLI", MAA = "MRT", MAS = "MUS", NIR = "NER", NIG = "NGA",
+  SEN = "SEN", SAF = "ZAF", SUD = "SDN", TOG = "TGO", ZAM = "ZMB"
+)
+polity_raw$iso3 <- scode_to_iso3[polity_raw$scode]
+polity <- polity_raw[!is.na(polity_raw$iso3) & polity_raw$year %in% pre_window,
+                      c("iso3", "year", "polity2")]
+names(polity)[1] <- "countrycode"
+
+fh_raw <- as.data.frame(read_excel("data/raw/freedom_house.xlsx",
+                                    sheet = "Country Ratings, Statuses ", col_names = FALSE))
+edition_row <- which(fh_raw[[1]] == "Survey Edition")
+year_row <- which(fh_raw[[1]] == "Year(s) Under Review")
+pr_row <- year_row + 1
+data_start <- pr_row + 1
+edition_header <- as.character(fh_raw[edition_row, ])
+year_header <- as.character(fh_raw[year_row, ])
+pr_cols <- which(as.character(fh_raw[pr_row, ]) == "PR")
+parse_fh_year <- function(col) {
+  clean_year <- suppressWarnings(as.integer(year_header[col]))
+  if (!is.na(clean_year)) return(clean_year)
+  parts <- strsplit(edition_header[col], "-")[[1]]
+  last <- parts[length(parts)]
+  last_num <- suppressWarnings(as.integer(last))
+  if (is.na(last_num)) return(NA)
+  if (nchar(last) == 2) last_num <- ifelse(last_num > 50, 1900 + last_num, 2000 + last_num)
+  last_num - 1
+}
+fh_long <- do.call(rbind, lapply(pr_cols, function(col) {
+  yr <- parse_fh_year(col)
+  if (is.na(yr) || !(yr %in% pre_window)) return(NULL)
+  data.frame(country = fh_raw[data_start:nrow(fh_raw), 1], year = yr,
+             pr = suppressWarnings(as.numeric(fh_raw[data_start:nrow(fh_raw), col])),
+             stringsAsFactors = FALSE)
+}))
+name_to_iso3 <- c(
+  Rwanda = "RWA", Botswana = "BWA", "Burkina Faso" = "BFA", "Cabo Verde" = "CPV",
+  Cameroon = "CMR", "Central African Republic" = "CAF", Chad = "TCD",
+  "Congo (Brazzaville)" = "COG", "Cote d'Ivoire" = "CIV", "Equatorial Guinea" = "GNQ",
+  Eswatini = "SWZ", Ethiopia = "ETH", Gabon = "GAB", "The Gambia" = "GMB",
+  Ghana = "GHA", "Guinea-Bissau" = "GNB", Kenya = "KEN", Lesotho = "LSO",
+  Madagascar = "MDG", Malawi = "MWI", Mali = "MLI", Mauritania = "MRT",
+  Mauritius = "MUS", Niger = "NER", Nigeria = "NGA", Senegal = "SEN",
+  "South Africa" = "ZAF", Sudan = "SDN", Togo = "TGO", Zambia = "ZMB"
+)
+fh_long$countrycode <- name_to_iso3[fh_long$country]
+political_rights <- fh_long[!is.na(fh_long$countrycode), c("countrycode", "year", "pr")]
+
+ucdp <- read.csv("data/raw/ucdp_conflict.csv", stringsAsFactors = FALSE)
+ucdp_name_to_iso3 <- c(
+  Rwanda = "RWA", Botswana = "BWA", "Burkina Faso" = "BFA", "Cape Verde" = "CPV",
+  Cameroon = "CMR", "Central African Republic" = "CAF", Chad = "TCD", Congo = "COG",
+  "Ivory Coast" = "CIV", "Equatorial Guinea" = "GNQ", Swaziland = "SWZ",
+  Ethiopia = "ETH", Gabon = "GAB", Gambia = "GMB", Ghana = "GHA",
+  "Guinea-Bissau" = "GNB", Kenya = "KEN", Lesotho = "LSO", Madagascar = "MDG",
+  Malawi = "MWI", Mali = "MLI", Mauritania = "MRT", Mauritius = "MUS",
+  Niger = "NER", Nigeria = "NGA", Senegal = "SEN", "South Africa" = "ZAF",
+  Sudan = "SDN", Togo = "TGO", Zambia = "ZMB"
+)
+ucdp$countrycode <- ucdp_name_to_iso3[ucdp$location_inc]
+conflict_avg <- aggregate(bd_best ~ countrycode, data = ucdp[!is.na(ucdp$countrycode) & ucdp$year %in% conflict_window, ],
+                           FUN = function(x) sum(x) / length(conflict_window))
+conflict <- merge(data.frame(countrycode = c("RWA", donors)), conflict_avg, all.x = TRUE)
+conflict$bd_best[is.na(conflict$bd_best)] <- 0
+conflict_grid <- expand.grid(countrycode = c("RWA", donors), year = conflict_window, stringsAsFactors = FALSE)
+conflict <- merge(conflict_grid, conflict, by = "countrycode")
+
+panel <- gdp
+panel <- merge(panel, invest_open, by = c("countrycode", "year"), all.x = TRUE)
+panel <- merge(panel, inflation, by = c("countrycode", "year"), all.x = TRUE)
+panel <- merge(panel, polity, by = c("countrycode", "year"), all.x = TRUE)
+panel <- merge(panel, political_rights, by = c("countrycode", "year"), all.x = TRUE)
+panel <- merge(panel, conflict[, c("countrycode", "year", "bd_best")], by = c("countrycode", "year"), all.x = TRUE)
+
+panel$unit_id <- as.numeric(factor(panel$countrycode))
+id_lookup <- unique(panel[, c("countrycode", "unit_id")])
+
+dir.create("results", showWarnings = FALSE)
+dir.create("figures", showWarnings = FALSE)
+
+odd_years <- seq(1971, 1993, by = 2)
+hodler_special_predictors <- c(
+  lapply(odd_years, function(yr) list("gdp", yr, "mean")),
+  list(
+    list("gdp", pre_window, "mean"),
+    list("ki", pre_window, "mean"),
+    list("openk", pre_window, "mean"),
+    list("inflation_cpi_pct", pre_window, "mean"),
+    list("polity2", pre_window, "mean"),
+    list("pr", pre_window, "mean"),
+    list("bd_best", conflict_window, "mean")
+  )
+)
+
+# ---- 2. One function that fits a synthetic control for ANY treated unit ---
 
 fit_one_unit <- function(treated_code, control_codes) {
   treated_id <- id_lookup$unit_id[id_lookup$countrycode == treated_code]
@@ -174,11 +280,7 @@ fit_one_unit <- function(treated_code, control_codes) {
     time.predictors.prior = first_year:(treatment_year - 1),
     time.optimize.ssr = first_year:(treatment_year - 1),
     time.plot = first_year:last_year,
-    special.predictors = list(
-      list("gdp", 1970:1979, "mean"),
-      list("gdp", 1980:1989, "mean"),
-      list("gdp", 1990:1993, "mean")
-    )
+    special.predictors = hodler_special_predictors
   )
 
   fit <- fit_synth_robust(dp)
@@ -195,37 +297,36 @@ fit_one_unit <- function(treated_code, control_codes) {
              ratio = post_rmspe / pre_rmspe)
 }
 
-# ---- 5. Run it for Rwanda, then for every donor country as a placebo -----
+# ---- 3. Run it for Rwanda, then for every donor country as a placebo -----
 
 all_units <- c("RWA", donors)
-cat("Fitting", length(all_units), "synthetic controls (this takes a few minutes)...\n")
+cat("Fitting", length(all_units), "synthetic controls (this takes a while)...\n")
 
 results <- data.frame()
 for (treated in all_units) {
-  others <- setdiff(donors, treated)  # every OTHER donor becomes that unit's control pool
+  others <- setdiff(donors, treated)
   one_result <- fit_one_unit(treated, others)
   results <- rbind(results, one_result)
-  cat(".")  # progress dot so we know it's still running
+  cat(".")
 }
 cat("\n")
 
-# ---- 6. Rank everyone by their ratio, find Rwanda's rank ------------------
+# ---- 4. Rank everyone by their ratio, find Rwanda's rank ------------------
 
 results <- results[order(-results$ratio), ]
 results$rank <- seq_len(nrow(results))
 rwanda_rank <- results$rank[results$unit == "RWA"]
 p_value <- rwanda_rank / nrow(results)
 
-dir.create("results", showWarnings = FALSE)
 write.csv(results, "results/placebo-full-pool-in-space.csv", row.names = FALSE)
 
 cat("\nRwanda's rank:", rwanda_rank, "of", nrow(results), "\n")
 cat("p-value (rank / total units):", round(p_value, 3), "\n")
 print(head(results, 6))
 
-# ---- 7. In-time placebo: pretend the treatment was in 1985 ----------------
-# Same full 39-country pool, but fit weights on 1970-1984 only, then check
-# 1985-1993 for a spurious gap before the real 1994 genocide.
+# ---- 5. In-time placebo: pretend the treatment was in 1985 ----------------
+# Simpler GDP-only special predictors -- see code/03's header comment for
+# why (UCDP conflict data doesn't exist before 1989).
 
 fake_year <- 1985
 fake_pre <- first_year:(fake_year - 1)

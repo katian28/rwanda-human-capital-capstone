@@ -3,8 +3,10 @@
 # Applies Hodler's own documented placebo-exclusion rule (see
 # docs/replication-feasibility.md: "exclusion from reported placebo
 # inference when pre-treatment RMSPE exceeds the placebo median plus one
-# standard deviation") to the full 39-country GDP placebo test from
-# code/04_placebo_gdp_full_pool.R (rank 21/40, p=0.53).
+# standard deviation") to the full-pool GDP placebo test from
+# code/04_placebo_gdp_full_pool.R. Pool size and rank are read from that
+# script's own output below, not hardcoded here, so this comment can't go
+# stale the way an earlier version of it did.
 #
 # This is a pre-specified rule from the paper being replicated, not a
 # post-hoc exclusion chosen after seeing which units look inconvenient.

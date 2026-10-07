@@ -4,8 +4,17 @@
 # this method). No custom math here: dataprep() and synth() do the
 # actual estimation, and synth.tab()/path.plot()/gaps.plot() (also from
 # the Synth package) build the table and plots. Every line is commented.
+#
+# Uses Hodler's actual documented predictor set (docs/replication-
+# feasibility.md, sourced from the manuscript): PWT 8.0 GDP, PWT 7.1
+# investment and openness, WDI inflation, Polity political regime,
+# Freedom House political rights, and UCDP conflict -- not the earlier
+# simplified three-special-predictor version this project used while
+# those five sources hadn't yet been assembled. See
+# code/14_predictor_assembly_check.R for the sourcing and completeness
+# verification behind this.
 
-library(readxl)   # to read the PWT 8.0 Excel file
+library(readxl)   # PWT 8.0, PWT 7.1 variable dictionary
 library(Synth)    # the actual synthetic control package
 library(rgenoud)  # genoud's outer search, called directly (see below)
 library(quadprog) # the inner QP solver we swap in for genoud's search
@@ -50,20 +59,16 @@ fit_synth_robust <- function(dp) {
   nvarsV <- nrow(X0)
   n_donors <- ncol(X0)
 
-  # Same scaling Synth::synth() uses internally (see its source): each
-  # predictor divided by its own standard deviation across all units.
   big <- cbind(X0, X1)
   divisor <- sqrt(apply(big, 1, var))
   scaled <- t(t(big) %*% (1 / divisor * diag(rep(nrow(big), 1))))
   X0.scaled <- scaled[, 1:n_donors]
   X1.scaled <- scaled[, ncol(scaled)]
 
-  # Same objective as Synth:::fn.V (predictor-weighted pre-treatment fit),
-  # but solving for the donor weights with quadprog instead of ipop.
   solve_w_quadprog <- function(v, X0.scaled, X1.scaled) {
     Vd <- diag(v, nrow = length(v), ncol = length(v))
     H <- t(X0.scaled) %*% Vd %*% X0.scaled
-    Dmat <- H + diag(1e-10, n_donors)  # tiny ridge, guards exact singularity only
+    Dmat <- H + diag(1e-10, n_donors)
     dvec <- as.numeric(t(X1.scaled) %*% Vd %*% X0.scaled)
     Amat <- cbind(rep(1, n_donors), diag(n_donors))
     bvec <- c(1, rep(0, n_donors))
@@ -80,15 +85,10 @@ fit_synth_robust <- function(dp) {
     as.numeric(t(Z1 - Z0 %*% w) %*% (Z1 - Z0 %*% w)) / nrow(Z0)
   }
 
-  # ---- Candidate 1's starting point: genoud's global search -----------------
   rgV.genoud <- genoud(fn_v_quadprog, nvarsV, X0.scaled = X0.scaled,
                         X1.scaled = X1.scaled, Z0 = Z0, Z1 = Z1, print.level = 0)
   SV1 <- rgV.genoud$par
 
-  # ---- Candidate 2's starting point: Synth's own regression-based guess -----
-  # Verbatim logic from Synth::synth()'s source: regress the outcome path on
-  # the (intercept-augmented) predictor matrix, and turn the coefficient
-  # cross-product's diagonal into a candidate V.
   Xall <- cbind(X1.scaled, X0.scaled)
   Xall <- cbind(rep(1, ncol(Xall)), t(Xall))
   Zall <- cbind(Z1, Z0)
@@ -101,9 +101,6 @@ fit_synth_robust <- function(dp) {
     rep(1 / nvarsV, nvarsV)
   }
 
-  # ---- Refine each starting point with Nelder-Mead AND BFGS (Synth's own
-  # optimxmethod default), keep whichever local method does best for that
-  # starting point -- exactly Synth's own refinement step, minus ipop.
   refine <- function(par0) {
     best <- list(par = par0, value = fn_v_quadprog(par0, X0.scaled, X1.scaled, Z0, Z1))
     for (m in c("Nelder-Mead", "BFGS")) {
@@ -117,8 +114,8 @@ fit_synth_robust <- function(dp) {
     best
   }
 
-  cand1 <- refine(SV1)  # genoud-seeded
-  cand2 <- refine(SV2)  # regression-seeded
+  cand1 <- refine(SV1)
+  cand2 <- refine(SV2)
   cat("genoud-seeded loss:", round(cand1$value, 6), " | regression-seeded loss:", round(cand2$value, 6), "\n")
 
   winning <- if (cand1$value <= cand2$value) cand1 else cand2
@@ -135,90 +132,187 @@ fit_synth_robust <- function(dp) {
   fit
 }
 
-# ---- 1. Load the raw data -------------------------------------------------
+treatment_year <- 1994
+first_year <- 1970
+last_year <- 2011
+pre_window <- 1985:1990      # Hodler's standard predictor-averaging window
+conflict_window <- 1991:1993 # Hodler's conflict-specific window (UCDP battle-
+                              # deaths data only starts 1989, plausibly why)
 
-pwt <- read_excel("data/raw/pwt80.xlsx", sheet = "Data")  # Penn World Table 8.0
-pwt <- as.data.frame(pwt)  # Synth wants a plain data.frame, not a tibble
+# Hodler's published donor weights are only non-zero for these 9 countries.
+# Liberia is dropped here: it has zero WDI inflation data anywhere before
+# 2002 (its own 1989-2003 civil wars), confirmed in
+# code/14_predictor_assembly_check.R -- not a parsing gap, a genuine
+# absence. Its own published weight was Hodler's smallest (0.032), so this
+# is a small, documented exclusion, not a consequential one.
+donors <- c("CMR", "COG", "GAB", "LSO", "MLI", "NER", "SDN", "SEN")
 
-# ---- 2. Set up the countries, years, and outcome variable ------------------
+# ---- 1. GDP (PWT 8.0) -------------------------------------------------------
 
-# Hodler's published donor weights are only non-zero for these 9 countries,
-# so this is the donor pool for the replication.
-donors <- c("CMR", "COG", "GAB", "LBR", "LSO", "MLI", "NER", "SDN", "SEN")
-
-treatment_year <- 1994  # the genocide
-first_year <- 1970      # start of the data window
-last_year <- 2011        # end of the data window
-outcome_var <- "rgdpe"   # real GDP, expenditure side (see results/replication-validation.md for why rgdpe, not rgdpo)
-
-# Keep only Rwanda + the 9 donors, and only the years we need.
-keep_rows <- pwt$countrycode %in% c("RWA", donors) & pwt$year %in% first_year:last_year
-panel <- pwt[keep_rows, c("countrycode", "year", outcome_var)]
-names(panel)[3] <- "gdp"  # rename the outcome column to something simple
-
-# ---- 3. Normalize GDP so 1991-1993 average = 1 -----------------------------
-# This matches how the rest of this project reports GDP (as a ratio to the
-# pre-genocide baseline), so the numbers below are comparable to the other
-# scripts. Synth itself does not require this step -- it works on raw
-# levels too -- but comparability across scripts is worth the extra step.
-
-for (country in unique(panel$countrycode)) {
-  is_this_country <- panel$countrycode == country
-  baseline <- mean(panel$gdp[is_this_country & panel$year %in% 1991:1993])
-  panel$gdp[is_this_country] <- panel$gdp[is_this_country] / baseline
+pwt80 <- as.data.frame(read_excel("data/raw/pwt80.xlsx", sheet = "Data"))
+gdp <- pwt80[pwt80$countrycode %in% c("RWA", donors) & pwt80$year %in% first_year:last_year,
+             c("countrycode", "year", "rgdpe")]
+names(gdp)[3] <- "gdp"
+for (c_ in unique(gdp$countrycode)) {
+  m <- gdp$countrycode == c_
+  baseline <- mean(gdp$gdp[m & gdp$year %in% 1991:1993])
+  gdp$gdp[m] <- gdp$gdp[m] / baseline
 }
 
-# ---- 4. Synth needs a NUMBER for each country, not a text code ------------
+# ---- 2. Investment share and openness (PWT 7.1) ----------------------------
+# Constant-price variants (ki, openk), the more standard choice in growth/
+# synthetic-control empirics (avoids relative-price distortions); Hodler's
+# own manuscript doesn't specify current vs. constant. isocode "ZAR" is
+# this vintage's code for DR Congo -- not relevant to this 8-donor pool,
+# kept as a documented fact from code/14, not remapped here.
 
-panel$unit_id <- as.numeric(factor(panel$countrycode))  # e.g. RWA -> 1, CMR -> 2, ...
-rwanda_id <- panel$unit_id[panel$countrycode == "RWA"][1]  # Rwanda's number
-donor_ids <- unique(panel$unit_id[panel$countrycode %in% donors])  # the donors' numbers
+pwt71 <- read.csv("data/raw/pwt71.csv", stringsAsFactors = FALSE)
+invest_open <- pwt71[pwt71$isocode %in% c("RWA", donors) & pwt71$year %in% pre_window,
+                      c("isocode", "year", "ki", "openk")]
+names(invest_open)[1] <- "countrycode"
 
-# ---- 5. dataprep(): package the data the way synth() expects it ------------
-# This is the standard Synth workflow: dataprep() first, then synth().
+# ---- 3. Inflation (WDI) -----------------------------------------------------
+
+wdi <- read.csv("data/raw/wdi_inflation.csv", stringsAsFactors = FALSE)
+inflation <- wdi[wdi$countrycode %in% c("RWA", donors) & wdi$year %in% pre_window,
+                  c("countrycode", "year", "inflation_cpi_pct")]
+
+# ---- 4. Polity political regime (Polity5) -----------------------------------
+# scode is NOT ISO3 for most countries -- verified directly in code/14, not
+# assumed. Mapping only the codes this 8-donor pool (+Rwanda) actually uses.
+
+polity_raw <- as.data.frame(read_excel("data/raw/polity.xls"))
+scode_to_iso3 <- c(RWA = "RWA", CAO = "CMR", CON = "COG", GAB = "GAB",
+                    LES = "LSO", MLI = "MLI", NIR = "NER", SUD = "SDN",
+                    SEN = "SEN")
+polity_raw$iso3 <- scode_to_iso3[polity_raw$scode]
+polity <- polity_raw[!is.na(polity_raw$iso3) & polity_raw$year %in% pre_window,
+                      c("iso3", "year", "polity2")]
+names(polity)[1] <- "countrycode"
+
+# ---- 5. Political rights (Freedom House) -------------------------------------
+# Pre-1990 editions use irregular, overlapping multi-month spans with no
+# clean single calendar year in "Year(s) Under Review"; the edition
+# label's SECOND year, minus 1, gives a clean gap-free annual series that
+# connects seamlessly to the clean post-1990 editions -- verified by hand
+# against the raw header row in code/14 (using the first year instead
+# leaves 1989 completely unassigned, which is wrong: there is no missing
+# year in the underlying editions, only in a naive parse of them).
+
+fh_raw <- as.data.frame(read_excel("data/raw/freedom_house.xlsx",
+                                    sheet = "Country Ratings, Statuses ", col_names = FALSE))
+edition_row <- which(fh_raw[[1]] == "Survey Edition")
+year_row <- which(fh_raw[[1]] == "Year(s) Under Review")
+pr_row <- year_row + 1
+data_start <- pr_row + 1
+edition_header <- as.character(fh_raw[edition_row, ])
+year_header <- as.character(fh_raw[year_row, ])
+pr_cols <- which(as.character(fh_raw[pr_row, ]) == "PR")
+
+parse_fh_year <- function(col) {
+  clean_year <- suppressWarnings(as.integer(year_header[col]))
+  if (!is.na(clean_year)) return(clean_year)
+  parts <- strsplit(edition_header[col], "-")[[1]]
+  last <- parts[length(parts)]
+  last_num <- suppressWarnings(as.integer(last))
+  if (is.na(last_num)) return(NA)
+  if (nchar(last) == 2) last_num <- ifelse(last_num > 50, 1900 + last_num, 2000 + last_num)
+  last_num - 1
+}
+
+fh_long <- do.call(rbind, lapply(pr_cols, function(col) {
+  yr <- parse_fh_year(col)
+  if (is.na(yr) || !(yr %in% pre_window)) return(NULL)
+  data.frame(country = fh_raw[data_start:nrow(fh_raw), 1], year = yr,
+             pr = suppressWarnings(as.numeric(fh_raw[data_start:nrow(fh_raw), col])),
+             stringsAsFactors = FALSE)
+}))
+name_to_iso3 <- c(Rwanda = "RWA", Cameroon = "CMR", "Congo (Brazzaville)" = "COG",
+                   Gabon = "GAB", Lesotho = "LSO", Mali = "MLI", Niger = "NER",
+                   Sudan = "SDN", Senegal = "SEN")
+fh_long$countrycode <- name_to_iso3[fh_long$country]
+political_rights <- fh_long[!is.na(fh_long$countrycode), c("countrycode", "year", "pr")]
+
+# ---- 6. Conflict (UCDP battle deaths) ---------------------------------------
+# Absence = true zero (no conflict crossed the reporting threshold), not
+# missing, for any year from 1989 onward -- confirmed in code/14. Averaged
+# over Hodler's own shorter 1991-1993 conflict window.
+
+ucdp <- read.csv("data/raw/ucdp_conflict.csv", stringsAsFactors = FALSE)
+ucdp_name_to_iso3 <- c(Rwanda = "RWA", Cameroon = "CMR", Congo = "COG", Gabon = "GAB",
+                        Lesotho = "LSO", Mali = "MLI", Niger = "NER", Sudan = "SDN",
+                        Senegal = "SEN")
+ucdp$countrycode <- ucdp_name_to_iso3[ucdp$location_inc]
+ucdp_agg <- aggregate(bd_best ~ countrycode, data = ucdp[!is.na(ucdp$countrycode) & ucdp$year %in% conflict_window, ], sum)
+conflict_grid <- expand.grid(countrycode = c("RWA", donors), year = conflict_window, stringsAsFactors = FALSE)
+# bd_best aggregated above is already summed across the window per country;
+# spread it back across the window's years evenly isn't meaningful for a
+# "mean" special predictor, so compute the window AVERAGE directly instead.
+conflict_avg <- aggregate(bd_best ~ countrycode, data = ucdp[!is.na(ucdp$countrycode) & ucdp$year %in% conflict_window, ],
+                           FUN = function(x) sum(x) / length(conflict_window))
+conflict <- merge(data.frame(countrycode = c("RWA", donors)), conflict_avg, all.x = TRUE)
+conflict$bd_best[is.na(conflict$bd_best)] <- 0
+# Expand into one row per conflict_window year (same averaged value each
+# year) so it merges cleanly into the single wide panel below; the special
+# predictor itself will average these three identical rows, recovering the
+# same window-average value either way.
+conflict <- merge(conflict_grid, conflict, by = "countrycode")
+
+# ---- 7. Merge everything into one wide panel --------------------------------
+
+panel <- gdp
+panel <- merge(panel, invest_open, by = c("countrycode", "year"), all.x = TRUE)
+panel <- merge(panel, inflation, by = c("countrycode", "year"), all.x = TRUE)
+panel <- merge(panel, polity, by = c("countrycode", "year"), all.x = TRUE)
+panel <- merge(panel, political_rights, by = c("countrycode", "year"), all.x = TRUE)
+panel <- merge(panel, conflict[, c("countrycode", "year", "bd_best")], by = c("countrycode", "year"), all.x = TRUE)
+
+panel$unit_id <- as.numeric(factor(panel$countrycode))
+rwanda_id <- panel$unit_id[panel$countrycode == "RWA"][1]
+donor_ids <- unique(panel$unit_id[panel$countrycode %in% donors])
+
+# ---- 8. dataprep(): Hodler's actual predictor set ---------------------------
+# "1985-1990 averages for most predictors and an additional 1991-1993
+# conflict average... normalized GDP in odd pre-treatment years through
+# 1993 plus average GDP levels in 1985-1990" (docs/replication-
+# feasibility.md, sourced from the manuscript).
+
+odd_years <- seq(1971, 1993, by = 2)
+gdp_odd_year_predictors <- lapply(odd_years, function(yr) list("gdp", yr, "mean"))
 
 dataprep_out <- dataprep(
-  foo = panel,                          # our data
-  dependent = "gdp",                    # the outcome we're matching/predicting
-  unit.variable = "unit_id",            # numeric country ID column
-  unit.names.variable = "countrycode",  # text country code column (for labels)
-  time.variable = "year",               # the year column
-  treatment.identifier = rwanda_id,     # which unit is "treated" (Rwanda)
-  controls.identifier = donor_ids,      # which units can be used to build the synthetic control
-  time.predictors.prior = first_year:(treatment_year - 1),  # pre-treatment years used to fit the weights
-  time.optimize.ssr = first_year:(treatment_year - 1),      # same window, used to choose the best-fitting weights
-  time.plot = first_year:last_year,     # years to include in the output/plots (pre AND post treatment)
-  # special.predictors: what the synthetic control tries to match before 1994.
-  # We use GDP's own average in three sub-periods (rather than one single
-  # average) because we don't yet have Hodler's full predictor set (PWT 7.1
-  # investment/openness, WDI inflation, Polity IV, Freedom House, UCDP
-  # conflict data) assembled -- see docs/replication-feasibility.md.
-  special.predictors = list(
-    list("gdp", 1970:1979, "mean"),  # average GDP, 1970s
-    list("gdp", 1980:1989, "mean"),  # average GDP, 1980s
-    list("gdp", 1990:1993, "mean")   # average GDP, just before the genocide
+  foo = panel,
+  dependent = "gdp",
+  unit.variable = "unit_id",
+  unit.names.variable = "countrycode",
+  time.variable = "year",
+  treatment.identifier = rwanda_id,
+  controls.identifier = donor_ids,
+  time.predictors.prior = first_year:(treatment_year - 1),
+  time.optimize.ssr = first_year:(treatment_year - 1),
+  time.plot = first_year:last_year,
+  special.predictors = c(
+    gdp_odd_year_predictors,
+    list(
+      list("gdp", pre_window, "mean"),
+      list("ki", pre_window, "mean"),
+      list("openk", pre_window, "mean"),
+      list("inflation_cpi_pct", pre_window, "mean"),
+      list("polity2", pre_window, "mean"),
+      list("pr", pre_window, "mean"),
+      list("bd_best", conflict_window, "mean")
+    )
   )
 )
 
-# ---- 6. synth(): the actual optimization that picks the donor weights -----
-# By default synth() already tries two starting points for V (equal
-# weights and a regression-based guess), each refined via Nelder-Mead and
-# BFGS, and keeps whichever wins (Abadie, Diamond & Hainmueller 2011,
-# "Synth: An R Package...", Journal of Statistical Software 42(13),
-# section 3.2, footnote 16). genoud=TRUE adds a third, globally-searched
-# starting point on top of that -- standard practice when the search space
-# may have local optima -- and with only 3 predictors here it's cheap
-# (~1-2 seconds), so there's no reason to skip it.
+# ---- 9. synth(): the actual optimization that picks the donor weights -----
 
 synth_out <- fit_synth_robust(dataprep_out)
 
-# ---- 7. Look at the results, using Synth's own built-in tools -------------
+# ---- 10. Look at the results, using Synth's own built-in tools -------------
 
-# synth.tab() prints a clean table: donor weights, and how much each
-# special predictor mattered (its "V weight").
 print(synth.tab(synth.res = synth_out, dataprep.res = dataprep_out))
 
-# path.plot(): Rwanda's actual GDP vs. the synthetic control's GDP, over time.
 dir.create("figures", showWarnings = FALSE)
 png("figures/gdp-reestimated-path.png", width = 1400, height = 900, res = 150)
 path.plot(
@@ -229,10 +323,9 @@ path.plot(
   Main = "Rwanda GDP: actual vs. independently re-estimated synthetic",
   Legend = c("Rwanda", "Synthetic Rwanda")
 )
-abline(v = treatment_year, lty = 3, col = "red")  # mark the genocide year
+abline(v = treatment_year, lty = 3, col = "red")
 dev.off()
 
-# gaps.plot(): just the gap (actual minus synthetic) over time.
 png("figures/gdp-reestimated-gaps.png", width = 1400, height = 900, res = 150)
 gaps.plot(
   synth.res = synth_out,
@@ -244,11 +337,10 @@ gaps.plot(
 abline(v = treatment_year, lty = 3, col = "red")
 dev.off()
 
-# ---- 8. Save the numbers other scripts/the paper can use -------------------
+# ---- 11. Save the numbers other scripts/the paper can use -------------------
 
 dir.create("results", showWarnings = FALSE)
 
-# Donor weights, compared to the published weights.
 published_weights <- c(
   CMR = 0.254, COG = 0.061, GAB = 0.149, LBR = 0.032, LSO = 0.192,
   MLI = 0.016, NER = 0.108, SDN = 0.014, SEN = 0.175
@@ -260,14 +352,12 @@ weights_table <- data.frame(
 )
 write.csv(weights_table, "results/gdp-reestimated-weights.csv", row.names = FALSE)
 
-# Actual vs. synthetic GDP, year by year.
-actual <- dataprep_out$Y1plot[, 1]                              # Rwanda's real path
-synthetic <- as.numeric(dataprep_out$Y0plot %*% synth_out$solution.w)  # weighted average of donors
+actual <- dataprep_out$Y1plot[, 1]
+synthetic <- as.numeric(dataprep_out$Y0plot %*% synth_out$solution.w)
 path_table <- data.frame(year = first_year:last_year, actual = actual, synthetic = synthetic)
 path_table$gap <- path_table$actual - path_table$synthetic
 write.csv(path_table, "results/gdp-reestimated-path.csv", row.names = FALSE)
 
-# Quick headline numbers, printed so they show up when this script runs.
 pre_years <- path_table$year < treatment_year
 pre_treatment_rmspe <- sqrt(mean(path_table$gap[pre_years]^2))
 gap_1994 <- path_table$gap[path_table$year == 1994]
