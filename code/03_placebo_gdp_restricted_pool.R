@@ -2,7 +2,7 @@
 # Placebo tests for the 9-country donor pool (the published-weight
 # countries only). This is a restricted-pool SENSITIVITY check, not the
 # headline placebo result: see code/04_placebo_gdp_full_pool.R for the
-# full 39-country test, which is the one to trust.
+# full 37-country test, which is the one to trust.
 #
 # In-space placebo: reassign the "treatment" to each donor country in
 # turn and see how big a gap it gets by chance, compared to Rwanda's.
@@ -122,10 +122,11 @@ last_year <- 2011
 pre_window <- 1985:1990
 conflict_window <- 1991:1993
 
-# Liberia dropped: zero WDI inflation data before 2002 (its own 1989-2003
-# civil wars), confirmed in code/14_predictor_assembly_check.R. Its own
-# published weight was Hodler's smallest (0.032).
-donors <- c("CMR", "COG", "GAB", "LSO", "MLI", "NER", "SDN", "SEN")
+# All 9 of Hodler's published donors are usable: Liberia only looked
+# unusable with WDI CPI inflation (zero coverage before 2002, its own
+# 1989-2003 civil wars); GDP-deflator inflation covers it fully -- see
+# code/14_predictor_assembly_check.R.
+donors <- c("CMR", "COG", "GAB", "LBR", "LSO", "MLI", "NER", "SDN", "SEN")
 
 # ---- 1. Load and merge Hodler's full predictor set -------------------------
 # Identical sourcing/merge logic to code/02 -- see there for full comments
@@ -148,14 +149,14 @@ invest_open <- pwt71[pwt71$isocode %in% c("RWA", donors) & pwt71$year %in% pre_w
                       c("isocode", "year", "ki", "openk")]
 names(invest_open)[1] <- "countrycode"
 
-wdi <- read.csv("data/raw/wdi_inflation.csv", stringsAsFactors = FALSE)
+wdi <- read.csv("data/raw/wdi_inflation_deflator.csv", stringsAsFactors = FALSE)
 inflation <- wdi[wdi$countrycode %in% c("RWA", donors) & wdi$year %in% pre_window,
-                  c("countrycode", "year", "inflation_cpi_pct")]
+                  c("countrycode", "year", "inflation_deflator_pct")]
 
 polity_raw <- as.data.frame(read_excel("data/raw/polity.xls"))
 scode_to_iso3 <- c(RWA = "RWA", CAO = "CMR", CON = "COG", GAB = "GAB",
-                    LES = "LSO", MLI = "MLI", NIR = "NER", SUD = "SDN",
-                    SEN = "SEN")
+                    LBR = "LBR", LES = "LSO", MLI = "MLI", NIR = "NER",
+                    SUD = "SDN", SEN = "SEN")
 polity_raw$iso3 <- scode_to_iso3[polity_raw$scode]
 polity <- polity_raw[!is.na(polity_raw$iso3) & polity_raw$year %in% pre_window,
                       c("iso3", "year", "polity2")]
@@ -188,15 +189,15 @@ fh_long <- do.call(rbind, lapply(pr_cols, function(col) {
              stringsAsFactors = FALSE)
 }))
 name_to_iso3 <- c(Rwanda = "RWA", Cameroon = "CMR", "Congo (Brazzaville)" = "COG",
-                   Gabon = "GAB", Lesotho = "LSO", Mali = "MLI", Niger = "NER",
-                   Sudan = "SDN", Senegal = "SEN")
+                   Gabon = "GAB", Liberia = "LBR", Lesotho = "LSO", Mali = "MLI",
+                   Niger = "NER", Sudan = "SDN", Senegal = "SEN")
 fh_long$countrycode <- name_to_iso3[fh_long$country]
 political_rights <- fh_long[!is.na(fh_long$countrycode), c("countrycode", "year", "pr")]
 
 ucdp <- read.csv("data/raw/ucdp_conflict.csv", stringsAsFactors = FALSE)
 ucdp_name_to_iso3 <- c(Rwanda = "RWA", Cameroon = "CMR", Congo = "COG", Gabon = "GAB",
-                        Lesotho = "LSO", Mali = "MLI", Niger = "NER", Sudan = "SDN",
-                        Senegal = "SEN")
+                        Liberia = "LBR", Lesotho = "LSO", Mali = "MLI", Niger = "NER",
+                        Sudan = "SDN", Senegal = "SEN")
 ucdp$countrycode <- ucdp_name_to_iso3[ucdp$location_inc]
 conflict_avg <- aggregate(bd_best ~ countrycode, data = ucdp[!is.na(ucdp$countrycode) & ucdp$year %in% conflict_window, ],
                            FUN = function(x) sum(x) / length(conflict_window))
@@ -225,7 +226,7 @@ hodler_special_predictors <- c(
     list("gdp", pre_window, "mean"),
     list("ki", pre_window, "mean"),
     list("openk", pre_window, "mean"),
-    list("inflation_cpi_pct", pre_window, "mean"),
+    list("inflation_deflator_pct", pre_window, "mean"),
     list("polity2", pre_window, "mean"),
     list("pr", pre_window, "mean"),
     list("bd_best", conflict_window, "mean")
@@ -323,11 +324,11 @@ write.csv(in_time, "results/placebo-restricted-in-time.csv", row.names = FALSE)
 # ---- 4. Report --------------------------------------------------------------
 
 lines <- c(
-  "# Placebo tests, 9-country donor pool (Liberia dropped -- see header)",
+  "# Placebo tests, 9-country donor pool (Hodler's published donors, all 9)",
   "",
   sprintf("**Run date:** %s", format(Sys.Date(), "%d %B %Y")),
   "",
-  "This is a restricted-pool sensitivity check, not the headline placebo result -- see `results/placebo-full-pool-in-space.csv` / `code/04_placebo_gdp_full_pool.R` for the full 39-country test. In-space placebo uses Hodler's full documented predictor set (PWT 7.1 investment/openness, WDI inflation, Polity, Freedom House, UCDP conflict); the in-time placebo uses simpler GDP-only predictors since UCDP conflict data doesn't exist before 1989 and cannot be shifted back to a fake 1985 treatment's pre-period.",
+  "This is a restricted-pool sensitivity check, not the headline placebo result -- see `results/placebo-full-pool-in-space.csv` / `code/04_placebo_gdp_full_pool.R` for the full 37-country test. In-space placebo uses Hodler's full documented predictor set (PWT 7.1 investment/openness, WDI inflation, Polity, Freedom House, UCDP conflict); the in-time placebo uses simpler GDP-only predictors since UCDP conflict data doesn't exist before 1989 and cannot be shifted back to a fake 1985 treatment's pre-period.",
   "",
   "## In-space placebo",
   "",

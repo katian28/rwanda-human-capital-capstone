@@ -40,7 +40,7 @@ lines <- c(
   "",
   "## Rule",
   "",
-  sprintf("Per `docs/replication-feasibility.md`, Hodler excludes placebo units whose own pre-treatment RMSPE exceeds the placebo group's median plus one standard deviation (threshold here: %.4f). This is the paper's own pre-specified rule, applied here to the full 39-country placebo test from `code/04_placebo_gdp_full_pool.R`.", threshold),
+  sprintf("Per `docs/replication-feasibility.md`, Hodler excludes placebo units whose own pre-treatment RMSPE exceeds the placebo group's median plus one standard deviation (threshold here: %.4f). This is the paper's own pre-specified rule, applied here to the full 37-country placebo test from `code/04_placebo_gdp_full_pool.R`.", threshold),
   "",
   "## Result",
   "",

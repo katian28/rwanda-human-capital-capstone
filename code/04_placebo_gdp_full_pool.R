@@ -8,16 +8,19 @@
 # fake gaps, that's evidence the gap is not statistically unusual.
 #
 # Uses Hodler's actual predictor set (PWT 7.1 investment/openness, WDI
-# inflation, Polity, Freedom House, UCDP conflict), not the earlier
-# simplified GDP-only special predictors. This genuinely shrinks the
-# usable donor pool -- from 39 countries (GDP-only completeness) down to
-# the ~29 with at least one real observation of every predictor in the
+# GDP-deflator inflation, Polity, Freedom House, UCDP conflict), not the
+# earlier simplified GDP-only special predictors. This genuinely shrinks
+# the usable donor pool -- from 39 countries (GDP-only completeness) down
+# to the 37 with at least one real observation of every predictor in the
 # window (verified in code/14_predictor_assembly_check.R; dataprep()
 # itself handles any remaining partial-year gaps via na.rm=TRUE, verified
-# directly against its own source behavior, not assumed). A smaller but
-# fully predictor-complete pool is the more defensible headline test than
-# a larger pool built on a predictor set we know is missing for many of
-# its members.
+# directly against its own source behavior, not assumed). Using
+# GDP-deflator inflation rather than WDI CPI is what keeps this pool at
+# 38 instead of 29: CPI has large real gaps across Sub-Saharan Africa
+# (including Liberia's entire pre-2002 history), the deflator does not.
+# A smaller but fully predictor-complete pool is the more defensible
+# headline test than a larger pool built on a predictor set we know is
+# missing for many of its members.
 #
 # Section 7 adds an in-time placebo (fake 1985 treatment) using the same
 # pool, with simpler GDP-only predictors -- see code/03's header comment
@@ -126,18 +129,26 @@ last_year <- 2011
 pre_window <- 1985:1990
 conflict_window <- 1991:1993
 
-# 29-country pool: Sub-Saharan Africa minus Rwanda and the spillover-risk
+# 37-country pool: Sub-Saharan Africa minus Rwanda and the spillover-risk
 # neighbors (Burundi, DR Congo, Tanzania, Uganda -- see docs/replication-
 # feasibility.md), further restricted to countries with at least one real
 # observation of EVERY Hodler predictor in its window (verified in
 # code/14_predictor_assembly_check.R's "lenient" check -- dataprep()
 # itself averages over whatever years are actually present via its own
 # na.rm=TRUE handling, confirmed directly against Synth's source, not
-# assumed).
-donors <- c("BWA", "BFA", "CPV", "CMR", "CAF", "TCD", "COG", "CIV", "GNQ",
-            "SWZ", "ETH", "GAB", "GMB", "GHA", "GNB", "KEN", "LSO", "MDG",
-            "MWI", "MLI", "MRT", "MUS", "NER", "NGA", "SEN", "ZAF", "SDN",
-            "TGO", "ZMB")
+# assumed). Uses GDP-deflator inflation, not CPI: CPI alone would have
+# left only 29 countries here (and dropped Liberia from the 9-donor pool
+# in code/02/03 entirely) -- the deflator has far better coverage across
+# this candidate pool (40 of 43 vs. 24 of 43), checked directly. Somalia
+# is excluded despite passing that predictor check: PWT 8.0 has zero
+# rgdpe (the dependent variable itself, not a special predictor) for
+# Somalia in any year used here -- a genuine PWT gap for a collapsed
+# state, not an avoidable sourcing choice.
+donors <- c("AGO", "BEN", "BWA", "BFA", "CPV", "CMR", "CAF", "TCD", "COM",
+            "COG", "CIV", "GNQ", "SWZ", "ETH", "GAB", "GMB", "GHA", "GIN",
+            "GNB", "KEN", "LSO", "LBR", "MDG", "MWI", "MLI", "MRT", "MUS",
+            "NAM", "NER", "NGA", "SEN", "SLE", "ZAF", "SDN", "TGO",
+            "ZMB", "ZWE")
 
 # ---- 1. Load and merge Hodler's full predictor set -------------------------
 # Identical sourcing/merge logic to code/02 -- see there for full comments
@@ -160,18 +171,20 @@ invest_open <- pwt71[pwt71$isocode %in% c("RWA", donors) & pwt71$year %in% pre_w
                       c("isocode", "year", "ki", "openk")]
 names(invest_open)[1] <- "countrycode"
 
-wdi <- read.csv("data/raw/wdi_inflation.csv", stringsAsFactors = FALSE)
+wdi <- read.csv("data/raw/wdi_inflation_deflator.csv", stringsAsFactors = FALSE)
 inflation <- wdi[wdi$countrycode %in% c("RWA", donors) & wdi$year %in% pre_window,
-                  c("countrycode", "year", "inflation_cpi_pct")]
+                  c("countrycode", "year", "inflation_deflator_pct")]
 
 polity_raw <- as.data.frame(read_excel("data/raw/polity.xls"))
 scode_to_iso3 <- c(
-  RWA = "RWA", BOT = "BWA", BFO = "BFA", CAP = "CPV", CAO = "CMR",
-  CEN = "CAF", CHA = "TCD", CON = "COG", IVO = "CIV", EQG = "GNQ",
-  SWA = "SWZ", ETH = "ETH", GAB = "GAB", GAM = "GMB", GHA = "GHA",
-  GNB = "GNB", KEN = "KEN", LES = "LSO", MAG = "MDG", MAW = "MWI",
-  MLI = "MLI", MAA = "MRT", MAS = "MUS", NIR = "NER", NIG = "NGA",
-  SEN = "SEN", SAF = "ZAF", SUD = "SDN", TOG = "TGO", ZAM = "ZMB"
+  RWA = "RWA", ANG = "AGO", BEN = "BEN", BOT = "BWA", BFO = "BFA",
+  CAP = "CPV", CAO = "CMR", CEN = "CAF", CHA = "TCD", COM = "COM",
+  CON = "COG", IVO = "CIV", EQG = "GNQ", SWA = "SWZ", ETH = "ETH",
+  GAB = "GAB", GAM = "GMB", GHA = "GHA", GUI = "GIN", GNB = "GNB",
+  KEN = "KEN", LES = "LSO", LBR = "LBR", MAG = "MDG", MAW = "MWI",
+  MLI = "MLI", MAA = "MRT", MAS = "MUS", NAM = "NAM", NIR = "NER",
+  NIG = "NGA", SEN = "SEN", SIE = "SLE", SOM = "SOM", SAF = "ZAF",
+  SUD = "SDN", TOG = "TGO", ZAM = "ZMB", ZIM = "ZWE"
 )
 polity_raw$iso3 <- scode_to_iso3[polity_raw$scode]
 polity <- polity_raw[!is.na(polity_raw$iso3) & polity_raw$year %in% pre_window,
@@ -205,28 +218,34 @@ fh_long <- do.call(rbind, lapply(pr_cols, function(col) {
              stringsAsFactors = FALSE)
 }))
 name_to_iso3 <- c(
-  Rwanda = "RWA", Botswana = "BWA", "Burkina Faso" = "BFA", "Cabo Verde" = "CPV",
-  Cameroon = "CMR", "Central African Republic" = "CAF", Chad = "TCD",
+  Rwanda = "RWA", Angola = "AGO", Benin = "BEN", Botswana = "BWA",
+  "Burkina Faso" = "BFA", "Cabo Verde" = "CPV", Cameroon = "CMR",
+  "Central African Republic" = "CAF", Chad = "TCD", Comoros = "COM",
   "Congo (Brazzaville)" = "COG", "Cote d'Ivoire" = "CIV", "Equatorial Guinea" = "GNQ",
   Eswatini = "SWZ", Ethiopia = "ETH", Gabon = "GAB", "The Gambia" = "GMB",
-  Ghana = "GHA", "Guinea-Bissau" = "GNB", Kenya = "KEN", Lesotho = "LSO",
-  Madagascar = "MDG", Malawi = "MWI", Mali = "MLI", Mauritania = "MRT",
-  Mauritius = "MUS", Niger = "NER", Nigeria = "NGA", Senegal = "SEN",
-  "South Africa" = "ZAF", Sudan = "SDN", Togo = "TGO", Zambia = "ZMB"
+  Ghana = "GHA", Guinea = "GIN", "Guinea-Bissau" = "GNB", Kenya = "KEN",
+  Lesotho = "LSO", Liberia = "LBR", Madagascar = "MDG", Malawi = "MWI",
+  Mali = "MLI", Mauritania = "MRT", Mauritius = "MUS", Namibia = "NAM",
+  Niger = "NER", Nigeria = "NGA", Senegal = "SEN", "Sierra Leone" = "SLE",
+  Somalia = "SOM", "South Africa" = "ZAF", Sudan = "SDN", Togo = "TGO",
+  Zambia = "ZMB", Zimbabwe = "ZWE"
 )
 fh_long$countrycode <- name_to_iso3[fh_long$country]
 political_rights <- fh_long[!is.na(fh_long$countrycode), c("countrycode", "year", "pr")]
 
 ucdp <- read.csv("data/raw/ucdp_conflict.csv", stringsAsFactors = FALSE)
 ucdp_name_to_iso3 <- c(
-  Rwanda = "RWA", Botswana = "BWA", "Burkina Faso" = "BFA", "Cape Verde" = "CPV",
-  Cameroon = "CMR", "Central African Republic" = "CAF", Chad = "TCD", Congo = "COG",
-  "Ivory Coast" = "CIV", "Equatorial Guinea" = "GNQ", Swaziland = "SWZ",
-  Ethiopia = "ETH", Gabon = "GAB", Gambia = "GMB", Ghana = "GHA",
-  "Guinea-Bissau" = "GNB", Kenya = "KEN", Lesotho = "LSO", Madagascar = "MDG",
-  Malawi = "MWI", Mali = "MLI", Mauritania = "MRT", Mauritius = "MUS",
-  Niger = "NER", Nigeria = "NGA", Senegal = "SEN", "South Africa" = "ZAF",
-  Sudan = "SDN", Togo = "TGO", Zambia = "ZMB"
+  Rwanda = "RWA", Angola = "AGO", Benin = "BEN", Botswana = "BWA",
+  "Burkina Faso" = "BFA", "Cape Verde" = "CPV", Cameroon = "CMR",
+  "Central African Republic" = "CAF", Chad = "TCD", Comoros = "COM",
+  Congo = "COG", "Ivory Coast" = "CIV", "Equatorial Guinea" = "GNQ",
+  Swaziland = "SWZ", Ethiopia = "ETH", Gabon = "GAB", Gambia = "GMB",
+  Ghana = "GHA", Guinea = "GIN", "Guinea-Bissau" = "GNB", Kenya = "KEN",
+  Lesotho = "LSO", Liberia = "LBR", Madagascar = "MDG", Malawi = "MWI",
+  Mali = "MLI", Mauritania = "MRT", Mauritius = "MUS", Namibia = "NAM",
+  Niger = "NER", Nigeria = "NGA", Senegal = "SEN", "Sierra Leone" = "SLE",
+  Somalia = "SOM", "South Africa" = "ZAF", Sudan = "SDN", Togo = "TGO",
+  Zambia = "ZMB", Zimbabwe = "ZWE"
 )
 ucdp$countrycode <- ucdp_name_to_iso3[ucdp$location_inc]
 conflict_avg <- aggregate(bd_best ~ countrycode, data = ucdp[!is.na(ucdp$countrycode) & ucdp$year %in% conflict_window, ],
@@ -256,7 +275,7 @@ hodler_special_predictors <- c(
     list("gdp", pre_window, "mean"),
     list("ki", pre_window, "mean"),
     list("openk", pre_window, "mean"),
-    list("inflation_cpi_pct", pre_window, "mean"),
+    list("inflation_deflator_pct", pre_window, "mean"),
     list("polity2", pre_window, "mean"),
     list("pr", pre_window, "mean"),
     list("bd_best", conflict_window, "mean")

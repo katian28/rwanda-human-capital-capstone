@@ -140,12 +140,15 @@ conflict_window <- 1991:1993 # Hodler's conflict-specific window (UCDP battle-
                               # deaths data only starts 1989, plausibly why)
 
 # Hodler's published donor weights are only non-zero for these 9 countries.
-# Liberia is dropped here: it has zero WDI inflation data anywhere before
-# 2002 (its own 1989-2003 civil wars), confirmed in
-# code/14_predictor_assembly_check.R -- not a parsing gap, a genuine
-# absence. Its own published weight was Hodler's smallest (0.032), so this
-# is a small, documented exclusion, not a consequential one.
-donors <- c("CMR", "COG", "GAB", "LSO", "MLI", "NER", "SDN", "SEN")
+# All 9 are usable: Liberia initially looked like it had to be dropped
+# (WDI CPI inflation has zero coverage for it before 2002 -- its own
+# 1989-2003 civil wars), but GDP-deflator inflation (NY.GDP.DEFL.KD.ZG)
+# covers it completely for 1985-1990, and covers the full donor candidate
+# pool far better than CPI does generally (40 of 43 vs. 24 of 43 -- see
+# code/14_predictor_assembly_check.R). A replication should imitate the
+# original as closely as data allows, not drop one of the paper's own
+# donors because of an avoidable choice of inflation series.
+donors <- c("CMR", "COG", "GAB", "LBR", "LSO", "MLI", "NER", "SDN", "SEN")
 
 # ---- 1. GDP (PWT 8.0) -------------------------------------------------------
 
@@ -171,20 +174,26 @@ invest_open <- pwt71[pwt71$isocode %in% c("RWA", donors) & pwt71$year %in% pre_w
                       c("isocode", "year", "ki", "openk")]
 names(invest_open)[1] <- "countrycode"
 
-# ---- 3. Inflation (WDI) -----------------------------------------------------
+# ---- 3. Inflation (WDI, GDP deflator) ---------------------------------------
+# GDP-deflator inflation (NY.GDP.DEFL.KD.ZG), not CPI (FP.CPI.TOTL.ZG):
+# CPI has large real gaps across this donor pool (including all of
+# Liberia's pre-2002 history); the deflator has full coverage for all 9 of
+# Hodler's donors and far better coverage across the wider candidate pool
+# generally -- checked directly, not assumed. See code/14 for both checks.
 
-wdi <- read.csv("data/raw/wdi_inflation.csv", stringsAsFactors = FALSE)
+wdi <- read.csv("data/raw/wdi_inflation_deflator.csv", stringsAsFactors = FALSE)
 inflation <- wdi[wdi$countrycode %in% c("RWA", donors) & wdi$year %in% pre_window,
-                  c("countrycode", "year", "inflation_cpi_pct")]
+                  c("countrycode", "year", "inflation_deflator_pct")]
 
 # ---- 4. Polity political regime (Polity5) -----------------------------------
 # scode is NOT ISO3 for most countries -- verified directly in code/14, not
-# assumed. Mapping only the codes this 8-donor pool (+Rwanda) actually uses.
+# assumed. Mapping only the codes this 9-donor pool (+Rwanda) actually uses
+# (Liberia's own scode happens to already be "LBR", matching ISO3).
 
 polity_raw <- as.data.frame(read_excel("data/raw/polity.xls"))
 scode_to_iso3 <- c(RWA = "RWA", CAO = "CMR", CON = "COG", GAB = "GAB",
-                    LES = "LSO", MLI = "MLI", NIR = "NER", SUD = "SDN",
-                    SEN = "SEN")
+                    LBR = "LBR", LES = "LSO", MLI = "MLI", NIR = "NER",
+                    SUD = "SDN", SEN = "SEN")
 polity_raw$iso3 <- scode_to_iso3[polity_raw$scode]
 polity <- polity_raw[!is.na(polity_raw$iso3) & polity_raw$year %in% pre_window,
                       c("iso3", "year", "polity2")]
@@ -228,8 +237,8 @@ fh_long <- do.call(rbind, lapply(pr_cols, function(col) {
              stringsAsFactors = FALSE)
 }))
 name_to_iso3 <- c(Rwanda = "RWA", Cameroon = "CMR", "Congo (Brazzaville)" = "COG",
-                   Gabon = "GAB", Lesotho = "LSO", Mali = "MLI", Niger = "NER",
-                   Sudan = "SDN", Senegal = "SEN")
+                   Gabon = "GAB", Liberia = "LBR", Lesotho = "LSO", Mali = "MLI",
+                   Niger = "NER", Sudan = "SDN", Senegal = "SEN")
 fh_long$countrycode <- name_to_iso3[fh_long$country]
 political_rights <- fh_long[!is.na(fh_long$countrycode), c("countrycode", "year", "pr")]
 
@@ -240,8 +249,8 @@ political_rights <- fh_long[!is.na(fh_long$countrycode), c("countrycode", "year"
 
 ucdp <- read.csv("data/raw/ucdp_conflict.csv", stringsAsFactors = FALSE)
 ucdp_name_to_iso3 <- c(Rwanda = "RWA", Cameroon = "CMR", Congo = "COG", Gabon = "GAB",
-                        Lesotho = "LSO", Mali = "MLI", Niger = "NER", Sudan = "SDN",
-                        Senegal = "SEN")
+                        Liberia = "LBR", Lesotho = "LSO", Mali = "MLI", Niger = "NER",
+                        Sudan = "SDN", Senegal = "SEN")
 ucdp$countrycode <- ucdp_name_to_iso3[ucdp$location_inc]
 ucdp_agg <- aggregate(bd_best ~ countrycode, data = ucdp[!is.na(ucdp$countrycode) & ucdp$year %in% conflict_window, ], sum)
 conflict_grid <- expand.grid(countrycode = c("RWA", donors), year = conflict_window, stringsAsFactors = FALSE)
@@ -297,7 +306,7 @@ dataprep_out <- dataprep(
       list("gdp", pre_window, "mean"),
       list("ki", pre_window, "mean"),
       list("openk", pre_window, "mean"),
-      list("inflation_cpi_pct", pre_window, "mean"),
+      list("inflation_deflator_pct", pre_window, "mean"),
       list("polity2", pre_window, "mean"),
       list("pr", pre_window, "mean"),
       list("bd_best", conflict_window, "mean")
