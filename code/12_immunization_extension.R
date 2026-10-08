@@ -19,10 +19,30 @@
 # deliberate reframing of the extension's research question, not a
 # like-for-like swap of the outcome variable. See
 # docs/data-availability.md's "immunization coverage" entry.
+#
+# Three special predictors beyond the lagged outcome itself, each
+# averaged over 1989-1993 (the most recent pre-treatment years, chosen
+# because UCDP conflict data doesn't exist before 1989 -- same logic as
+# Hodler's own recent-years average window in the GDP replication):
+#   - MCV1 (measles) coverage: same WHO/UNICEF WUENIC source as DTP3,
+#     measures the same underlying thing (routine immunization system
+#     functioning) without being the outcome itself.
+#   - UCDP conflict (battle deaths): conflict disrupts the cold chain,
+#     clinic access, and health-worker safety directly -- not just a
+#     generic governance proxy, a specific mechanism for vaccination.
+#   - GDP per capita (PWT rgdpe/pop): wealth proxies general health-
+#     system capacity and financing.
+# All three are already-sourced, genuinely annual data (no interpolated
+# series), consistent with why DTP3 itself was chosen over hc. GDP per
+# capita has zero PWT coverage for Somalia and Seychelles (checked
+# directly, not assumed -- PWT has no rows for either), so both are
+# dropped from the donor pool below; Somalia's exclusion is also a
+# known fix for the baseline-dominance problem flagged in code/13.
 
 library(Synth)
 library(rgenoud)
 library(quadprog)
+library(readxl)
 
 set.seed(42)
 
@@ -146,6 +166,19 @@ complete_years <- tapply(!is.na(coverage[[outcome_var]]), coverage$countrycode, 
 donors <- names(complete_years)[complete_years == length(first_year:last_year)]
 cat(length(donors), "donors have complete DTP3 coverage,", first_year, "-", last_year, "\n")
 
+# GDP per capita (PWT rgdpe/pop) has zero coverage at all for Somalia and
+# Seychelles -- confirmed directly against the downloaded file, not
+# assumed. Drop them here so every remaining donor has real data for
+# every special predictor used below.
+pwt80 <- as.data.frame(read_excel("data/raw/pwt80.xlsx", sheet = "Data"))
+gdp_pc_window <- 1989:1993
+gdp_pc_check <- pwt80[pwt80$countrycode %in% donors & pwt80$year %in% gdp_pc_window, ]
+gdp_pc_ok <- tapply(!is.na(gdp_pc_check$rgdpe) & !is.na(gdp_pc_check$pop), gdp_pc_check$countrycode, sum)
+no_gdp_pc <- setdiff(donors, names(gdp_pc_ok)[gdp_pc_ok > 0])
+donors <- setdiff(donors, no_gdp_pc)
+cat("Dropped for missing GDP-per-capita data:", paste(no_gdp_pc, collapse = ", "), "\n")
+cat(length(donors), "donors remain after the GDP-per-capita completeness check\n")
+
 # ---- 3. Build the panel (Rwanda + all donors) ------------------------------
 # NOT normalized to a baseline, unlike code/02 (GDP) and code/07 (hc). DTP3
 # is already a percentage on a common 0-100 scale across every country, so
@@ -161,13 +194,54 @@ panel <- dtp3[dtp3$countrycode %in% c("RWA", donors) & dtp3$year %in% first_year
               c("countrycode", "year", outcome_var)]
 names(panel)[3] <- "coverage"
 
+# ---- 3b. Load and merge the three external predictors ---------------------
+# All averaged over 1989-1993 (see header comment for why that window and
+# why these three). MCV1 uses the same WUENIC source/structure as DTP3.
+
+mcv1_raw <- read.csv("data/raw/who_mcv1_coverage.csv", stringsAsFactors = FALSE)
+names(mcv1_raw) <- c("country_name", "countrycode", "year", "mcv1")
+mcv1 <- mcv1_raw[mcv1_raw$countrycode %in% c("RWA", donors) & mcv1_raw$year %in% first_year:last_year,
+                  c("countrycode", "year", "mcv1")]
+
+gdp_pc <- pwt80[pwt80$countrycode %in% c("RWA", donors) & pwt80$year %in% first_year:last_year,
+                c("countrycode", "year", "rgdpe", "pop")]
+gdp_pc$gdp_pc <- gdp_pc$rgdpe / gdp_pc$pop
+
+ucdp <- read.csv("data/raw/ucdp_conflict.csv", stringsAsFactors = FALSE)
+ucdp_name_to_iso3 <- c(
+  Rwanda = "RWA", Botswana = "BWA", "Central African Republic" = "CAF",
+  Cameroon = "CMR", Congo = "COG", Ethiopia = "ETH", Ghana = "GHA",
+  Gambia = "GMB", Lesotho = "LSO", Mozambique = "MOZ", Mauritania = "MRT",
+  Mauritius = "MUS", Malawi = "MWI", Niger = "NER", Sudan = "SDN",
+  "Sao Tome and Principe" = "STP", Swaziland = "SWZ", Togo = "TGO",
+  Zimbabwe = "ZWE"
+)
+conflict_window <- 1989:1993
+ucdp$countrycode <- ucdp_name_to_iso3[ucdp$location_inc]
+conflict_avg <- aggregate(bd_best ~ countrycode, data = ucdp[!is.na(ucdp$countrycode) & ucdp$year %in% conflict_window, ],
+                           FUN = function(x) sum(x) / length(conflict_window))
+conflict <- merge(data.frame(countrycode = c("RWA", donors)), conflict_avg, all.x = TRUE)
+conflict$bd_best[is.na(conflict$bd_best)] <- 0
+conflict_grid <- expand.grid(countrycode = c("RWA", donors), year = conflict_window, stringsAsFactors = FALSE)
+conflict <- merge(conflict_grid, conflict, by = "countrycode")
+
+panel <- merge(panel, mcv1, by = c("countrycode", "year"), all.x = TRUE)
+panel <- merge(panel, gdp_pc[, c("countrycode", "year", "gdp_pc")], by = c("countrycode", "year"), all.x = TRUE)
+panel <- merge(panel, conflict[, c("countrycode", "year", "bd_best")], by = c("countrycode", "year"), all.x = TRUE)
+
 panel$unit_id <- as.numeric(factor(panel$countrycode))
 id_lookup <- unique(panel[, c("countrycode", "unit_id")])
+
+ext_predictors <- list(
+  list("mcv1", conflict_window, "mean"),
+  list("gdp_pc", conflict_window, "mean"),
+  list("bd_best", conflict_window, "mean")
+)
 
 # ---- 4. Fit Rwanda's synthetic control (the main result) ------------------
 # Three special predictors spanning the shorter 1981-1993 pre-treatment
 # window (13 years, vs. 24 for GDP/hc), split the same way: early, middle,
-# immediately pre-treatment.
+# immediately pre-treatment, plus the three external predictors above.
 
 rwanda_id <- id_lookup$unit_id[id_lookup$countrycode == "RWA"]
 donor_ids <- id_lookup$unit_id[id_lookup$countrycode %in% donors]
@@ -183,10 +257,13 @@ dp_main <- dataprep(
   time.predictors.prior = first_year:(treatment_year - 1),
   time.optimize.ssr = first_year:(treatment_year - 1),
   time.plot = first_year:last_year,
-  special.predictors = list( #find more predictors like 3-5
-    list("coverage", 1981:1985, "mean"),
-    list("coverage", 1986:1989, "mean"),
-    list("coverage", 1990:1993, "mean")
+  special.predictors = c(
+    list(
+      list("coverage", 1981:1985, "mean"),
+      list("coverage", 1986:1989, "mean"),
+      list("coverage", 1990:1993, "mean")
+    ),
+    ext_predictors
   )
 )
 
@@ -251,10 +328,13 @@ fit_one_unit <- function(treated_code, control_codes) {
     time.predictors.prior = first_year:(treatment_year - 1),
     time.optimize.ssr = first_year:(treatment_year - 1),
     time.plot = first_year:last_year,
-    special.predictors = list(
-      list("coverage", 1981:1985, "mean"),
-      list("coverage", 1986:1989, "mean"),
-      list("coverage", 1990:1993, "mean")
+    special.predictors = c(
+      list(
+        list("coverage", 1981:1985, "mean"),
+        list("coverage", 1986:1989, "mean"),
+        list("coverage", 1990:1993, "mean")
+      ),
+      ext_predictors
     )
   )
 
