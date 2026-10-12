@@ -1,29 +1,27 @@
 # Immunization coverage extension: results
 
-**Run date:** 6 October 2026 (supersedes the 1 October version, which used normalized ratios)
+**Run date:** 8 October 2026 (supersedes the 6 October version, which used only lagged-outcome special predictors, no external covariates)
 
-Public-health service-delivery recovery extension (`code/12_immunization_extension.R`), DTP3 coverage, 20-country Sub-Saharan Africa donor pool with complete 1981-2011 data. See `docs/data-availability.md` for why this replaced `hc` as the extension outcome.
+Public-health service-delivery recovery extension (`code/12_immunization_extension.R`), DTP3 coverage, 18-country Sub-Saharan Africa donor pool. See `docs/data-availability.md` for why this replaced `hc` as the extension outcome.
 
-## A methodological correction: dropped the baseline normalization
+## Predictors: three lagged-outcome, plus three external
 
-The first version of this analysis normalized every country's DTP3 series to its own 1991-1993 average (the same convention used for GDP in `code/02` and the rejected `hc` extension in `code/07`). That convention makes sense for GDP, which has no common cross-country scale. It does not make sense for DTP3, which is already a percentage on a common 0-100 scale. Worse, normalizing a *bounded* percentage by its own baseline is distorting: a country starting near 90% coverage has almost no room to rise above 1.0 (ceiling effect), while a low-baseline country has enormous room to swing far above 1.0 from a modest percentage-point gain. This is plausibly why the normalized version's synthetic control put 39% of its weight on Somalia (1991-1993 baseline ~21%, among the lowest in the pool) — not because Somalia was a substantively good match, but because the normalization mechanically inflated how much a low-baseline country's later gains could move the fit.
+The main fit uses three lagged-DTP3-coverage special predictors (1981-1985, 1986-1989, 1990-1993 averages) plus three external predictors averaged over 1989-1993: MCV1 (measles) coverage, same WHO/UNICEF WUENIC source as DTP3; UCDP conflict (battle deaths), a direct mechanism for vaccine-delivery disruption; and GDP per capita (PWT `rgdpe`/`pop`), a health-financing proxy. An earlier version used only the lagged-outcome predictors; adding the three external ones brings this extension's rigor in line with the GDP replication's own use of real external covariates.
 
-**Dropping normalization and using raw DTP3 percentage-point levels fixes this at the source: Somalia gets 0% weight in the re-fit, without needing a post-hoc exclusion.** `code/13`'s Somalia-exclusion robustness check (previously necessary) is now redundant — it produces results identical to the main fit, because the main fit no longer selects Somalia in the first place. Kept in the repo for the record, not because it's still doing independent work.
+GDP per capita has zero PWT coverage for Somalia and Seychelles (confirmed directly, not a window gap -- no rows at all), so both are dropped from the donor pool. This also resolves, at the data-sourcing stage, an earlier problem where Somalia's unusually low baseline mechanically dominated the synthetic control's weights under a now-superseded normalized specification -- raw percentage-point levels were adopted for that reason, and Somalia's exclusion here is a second, independent fix to the same underlying issue.
 
 ## Main result (raw percentage points)
 
-- Donor weights: Swaziland (SWZ) 58%, Republic of the Congo (COG) 21%, Seychelles (SYC) 21% — three donors, nothing on Somalia. (`results/immunization-extension-weights.csv`)
-- Pre-treatment RMSPE: 7.56 percentage points — a tight fit on a 0-100 scale.
-- 1994 gap: **-64.2 percentage points**, matching the raw 83%→23% crash.
-- Average post-treatment gap: **+4.5 percentage points** — positive. Rwanda's actual coverage runs slightly *above* its synthetic counterfactual on average after 1994, not below.
-- The path (`figures/immunization-extension-path.png`) shows a tight pre-treatment fit, a sharp one-year collapse, fast recovery, and Rwanda's actual coverage **overtaking** its synthetic counterfactual by the mid-2000s (consistent with Rwanda's well-documented post-genocide health-system investment pushing coverage to near-universal ~97% by the late 2000s, while the donor-pool-based synthetic stays around 85-90%).
-
-This is a materially cleaner and more defensible result than the normalized version, which showed an artificial-looking "persistent unclosed gap" driven substantially by Somalia's mechanically inflated influence.
+- Donor weights: Swaziland (SWZ) 87%, Republic of the Congo (COG) 9.3%, Lesotho (LSO) 3.7% -- three donors, nothing on Somalia or any other donor. (`results/immunization-extension-weights.csv`)
+- Pre-treatment RMSPE: 9.00 percentage points.
+- 1994 gap: **-68.9 percentage points** (actual 23%, synthetic 91.9%), matching the raw 83%->23% crash.
+- Average post-treatment gap: **+3.1 percentage points** -- positive. Rwanda's actual coverage runs above its synthetic counterfactual on average after 1994; the 2011 gap is +6.6.
+- The path (`figures/immunization-extension-path.png`) shows a sharp one-year collapse, fast recovery, and Rwanda's actual coverage **overtaking** its synthetic counterfactual from 1995 onward in most years -- consistent with Rwanda's well-documented post-genocide health-system investment pushing coverage to near-universal (~97%) by the late 2000s, while the donor-pool synthetic stays in the mid-to-high 80s.
 
 ## Placebo result
 
-**Rwanda's rank: 10 of 21 (p = 0.476).** Improved from the normalized version's 14/21 (p = 0.667), though still not conventionally significant — Rwanda sits almost exactly at the median of the placebo distribution, not toward either tail. Still does not support a strong standalone causal claim from the placebo test alone, consistent with the GDP section's own honest full-pool result (p = 0.775) — but the raw path, especially the overtake after 2000, is a more striking and more defensible descriptive finding than the normalized version produced.
+**Rwanda's rank: 12 of 19 (p = 0.632).** This is weaker than an earlier, less complete specification's 10 of 21 (p = 0.476) -- adding the three external predictors was motivated by specification fidelity, not by searching for a better number, and it moved the result in the less favorable direction. Still does not support a strong standalone causal claim from the placebo test alone, consistent with how the GDP section reports its own full-pool result without overclaiming -- but the raw path, especially the post-1995 overtake, remains a striking descriptive finding independent of the placebo test's verdict.
 
 ## Files
 
-`results/immunization-extension-path.csv`, `results/immunization-extension-weights.csv`, `results/immunization-extension-placebo.csv`, `figures/immunization-extension-path.png`, `figures/immunization-extension-gaps.png` — current (un-normalized) main result. `results/immunization-no-somalia-*.csv`, `figures/immunization-no-somalia-path.png` — now-redundant Somalia-exclusion check, kept for the record.
+`results/immunization-extension-path.csv`, `results/immunization-extension-weights.csv`, `results/immunization-extension-placebo.csv`, `figures/immunization-extension-path.png`, `figures/immunization-extension-gaps.png` -- current result. The earlier Somalia-exclusion robustness check (`code/13`) was removed on 10 October 2026 once it became redundant with the main fit's own donor pool; it remains recoverable from git history.
