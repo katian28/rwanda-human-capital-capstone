@@ -2,6 +2,11 @@
 
 Add a new entry before each meeting. Newest at the top. Three lines is enough.
 
+## 2026-10-12
+- **Done:** Fixed a replication-fidelity problem (Liberia, one of Hodler's own 9 donors, had been dropped because WDI CPI inflation has zero coverage for it pre-2002) by switching to WDI's GDP-deflator inflation series across code/02-06; full-pool placebo improved from 20/30 (p=0.667) to 18/38 (p=0.474). Rebuilt the immunization extension's predictors (added MCV1, UCDP conflict, GDP per capita; code/12), which also resolved Somalia's old weight-dominance problem at the source — placebo rank moved from 10/21 (p=0.476) to 12/19 (p=0.632), reported honestly even though weaker. Removed code/13 (now-redundant Somalia-exclusion check). Redrafted all 7 writing/drafts sections against the updated facts files.
+- **Next:** Review the redrafted sections end to end; decide whether to build an in-time placebo for the extension (the GDP side has one, the extension doesn't); update PLAN.md off its original human-capital-extension template before the first committee meeting.
+- **Blocked:** None currently.
+
 ## 2026-10-01
 - **Done:** Fixed a real numerical bug in how `Synth`'s genoud optimizer was being used (silently returned suboptimal donor weights near sparse solutions); re-ran the full pipeline with a verified-faithful reimplementation of `synth()`'s actual documented algorithm. Headline full-pool GDP placebo moved to its honest, final value: rank 31/40 (p=0.775). Diagnosed `hc` as unusable at any frequency (fabricated annual resolution, confirmed by PWT's own methodology docs); surveyed and rejected fertility/infant mortality and government spending as replacements; confirmed immunization coverage (DTP3) passes the balanced-panel screen and reframed the extension around public-health service-delivery recovery. Drafted the replication and background sections of the paper.
 - **Next:** Build the immunization-coverage synthetic control and placebo test (mirrors code/07's structure); draft the extension section once those results exist.
