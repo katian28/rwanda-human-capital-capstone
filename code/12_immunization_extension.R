@@ -374,3 +374,50 @@ write.csv(placebo_results, "results/immunization-extension-placebo.csv", row.nam
 cat("\nRwanda's placebo rank:", rwanda_rank, "of", nrow(placebo_results), "\n")
 cat("p-value (rank / total units):", round(p_value, 3), "\n")
 print(head(placebo_results, 6))
+
+# ---- 6. In-time placebo: pretend the treatment was in 1989 -----------------
+# Lagged-outcome-only special predictors, same reasoning as code/04's own
+# in-time placebo: UCDP conflict data doesn't exist before 1989, so none
+# of the three external predictors (MCV1, conflict, GDP per capita) can
+# be computed for a fake pre-treatment window that ends before 1989.
+# fake_year = 1989 splits the 13-year real pre-treatment window (1981-
+# 1993) into an 8-year fake-pre period (enough to fit a pre-trend) and a
+# 5-year fake-post period immediately preceding the real 1994 treatment.
+
+fake_year <- 1989
+fake_pre <- first_year:(fake_year - 1)
+
+dp_fake <- dataprep(
+  foo = panel,
+  dependent = "coverage",
+  unit.variable = "unit_id",
+  unit.names.variable = "countrycode",
+  time.variable = "year",
+  treatment.identifier = rwanda_id,
+  controls.identifier = donor_ids,
+  time.predictors.prior = fake_pre,
+  time.optimize.ssr = fake_pre,
+  time.plot = first_year:last_year,
+  special.predictors = list(
+    list("coverage", 1981:1984, "mean"),
+    list("coverage", 1985:1988, "mean")
+  )
+)
+fit_fake <- fit_synth_robust(dp_fake)
+actual_fake <- dp_fake$Y1plot[, 1]
+synthetic_fake <- as.numeric(dp_fake$Y0plot %*% fit_fake$solution.w)
+gap_fake <- actual_fake - synthetic_fake
+years <- first_year:last_year
+
+in_time_pre_rmspe <- sqrt(mean(gap_fake[years < fake_year]^2))
+in_time_post_rmspe <- sqrt(mean(gap_fake[years >= fake_year & years < treatment_year]^2))
+in_time_ratio <- in_time_post_rmspe / in_time_pre_rmspe
+
+write.csv(
+  data.frame(year = years, actual = actual_fake, synthetic = synthetic_fake, gap = gap_fake),
+  "results/immunization-extension-in-time.csv", row.names = FALSE
+)
+cat("\nIn-time placebo (fake 1989 treatment):\n")
+cat("Pre-1989 RMSPE:", round(in_time_pre_rmspe, 4), "\n")
+cat("1989-1993 RMSPE:", round(in_time_post_rmspe, 4), "\n")
+cat("Ratio:", round(in_time_ratio, 2), "\n")
