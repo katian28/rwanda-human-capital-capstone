@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use this repository, please cite it using the metadata below."
-title: "Rwanda's Human Capital Recovery After the 1994 Genocide"
+title: "Rwanda's Post-Genocide Recovery: A Synthetic-Control Replication and Extension of Hodler (2019)"
 type: software
 authors:
   - family-names: "Nkurunziza"

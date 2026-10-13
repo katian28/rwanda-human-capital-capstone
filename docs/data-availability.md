@@ -1,14 +1,16 @@
 # Human-capital outcome feasibility
 
-**Decision:** REDESIGN the extension; do not abandon the project
+**Decision (superseded, see below): REDESIGN the extension; do not abandon the project**
 
 **Evidence date:** 9 September 2026
 
-## Bottom line
+**Final decision, 29 September 2026: the extension outcome is immunization coverage (WHO/UNICEF WUENIC DTP3), not PWT `hc`.** The "Bottom line" and "Recommended design" immediately below reflect this file's state as of 9 September, before `hc` was tested further and rejected (see the dated entries later in this file, "Checked 24 September," "Checked 26 September") and before immunization coverage was identified and adopted ("Checked 29 September 2026: immunization coverage (DTP3/MCV1) — passes"). They are kept as-written for the historical record, not corrected in place, so the investigation stays visible — but they are not the project's current design. See `docs/paper-facts-extension.md` for the current, authoritative summary.
+
+## Bottom line (as of 9 September 2026 — superseded)
 
 The proposed extension remains feasible, but **current WDI gross secondary enrollment cannot serve as the primary outcome in a conventional balanced-panel synthetic-control design**. Rwanda is missing 1994–1998 and most plausible donors are missing different years. PWT 8.0 human capital is technically feasible for the original annual panel, while Barro–Lee is available only at five-year intervals and is better treated as a low-frequency sensitivity analysis.
 
-Recommended design:
+Recommended design (as of 9 September 2026 — superseded, see "Final decision" above):
 
 1. use PWT 8.0 human capital (`hc`) as the primary technically feasible extension, with careful language about what the constructed index measures;
 2. use WDI/UIS secondary enrollment as a secondary post-1999 analysis or move to a missing-data-capable estimator after advisor approval;
@@ -64,13 +66,13 @@ The [Barro–Lee dataset](https://barrolee.github.io/BarroLeeDataSet/) and [vers
 
 This provides only five pre-treatment points from 1970–1990 and places the first post-treatment point in 1995. The dataset also uses filling and extrapolation. It can corroborate long-run attainment but cannot identify annual recovery timing with Hodler’s precision.
 
-## Defensible options
+## Defensible options (as of 9 September 2026 — superseded, see "Final decision" above)
 
-**Recommended:** retain the capstone and define the extension as the effect on PWT 8.0 `hc`. Use WDI enrollment descriptively from 1999 and Barro–Lee as a five-year robustness outcome.
+**Recommended at the time:** retain the capstone and define the extension as the effect on PWT 8.0 `hc`. Use WDI enrollment descriptively from 1999 and Barro–Lee as a five-year robustness outcome. (Superseded 29 September 2026 — `hc` was tested further and rejected; see above.)
 
 **Higher method risk:** keep enrollment primary but use an estimator designed for incomplete panels, such as an explicitly justified generalized or augmented synthetic-control or matrix-completion method. This changes the method and requires advisor approval and strong diagnostics.
 
-**Change only the extension:** if the course requires the same conventional estimator and an annual observed education outcome, replace secondary enrollment with an outcome that passes a frozen donor-coverage screen. Keep the GDP replication.
+**Change only the extension:** if the course requires the same conventional estimator and an annual observed education outcome, replace secondary enrollment with an outcome that passes a frozen donor-coverage screen. Keep the GDP replication. **This is the option that was ultimately taken** — immunization coverage (DTP3) replaced secondary enrollment and `hc` alike, for exactly this reason.
 
 ## Deadlines
 
