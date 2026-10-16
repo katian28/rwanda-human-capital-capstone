@@ -375,7 +375,7 @@ The three most important things: Identification, Identification, Identification.
 4. Explain the economics of why your instruments are valid
 5. Describe the source of variation driving your estimates for every number you present
 
-*For strategy-specific narrative structure (RCT, DiD/staggered, IV, RDD, Synthetic Control/DiD, Bunching, Shift-Share, Event Study, ML, Structural), see [identification-strategies.md](identification-strategies.md).*
+*For strategy-specific narrative structure (RCT, DiD/staggered, IV, RDD, Matching, Synthetic Control/DiD, Bunching, Shift-Share, Event Study, ML, Structural), see [identification-strategies.md](identification-strategies.md).*
 
 ## Results Presentation
 - Start with the main result. No warmup exercises
