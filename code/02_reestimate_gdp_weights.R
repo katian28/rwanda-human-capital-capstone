@@ -162,6 +162,19 @@ for (c_ in unique(gdp$countrycode)) {
   gdp$gdp[m] <- gdp$gdp[m] / baseline
 }
 
+# ---- 1b. Human capital index (PWT 8.0) --------------------------------------
+# The manuscript (Almer & Hodler 2015 working-paper draft, p.7) names this
+# explicitly: "The human capital index from PWT 8.0, which is based on
+# years of schooling and an estimate of the rate of return." An earlier
+# version of this script omitted it -- not a documented decision, just
+# never added -- which this version corrects. All 9 of Hodler's donors
+# have complete PWT 8.0 hc coverage for 1985-1990, confirmed directly;
+# no donor-pool change needed here (contrast code/04, where 11 of the
+# full-pool's 37 candidates lack hc entirely and must be dropped).
+
+hc <- pwt80[pwt80$countrycode %in% c("RWA", donors) & pwt80$year %in% pre_window,
+            c("countrycode", "year", "hc")]
+
 # ---- 2. Investment share and openness (PWT 7.1) ----------------------------
 # Constant-price variants (ki, openk), the more standard choice in growth/
 # synthetic-control empirics (avoids relative-price distortions); Hodler's
@@ -270,6 +283,7 @@ conflict <- merge(conflict_grid, conflict, by = "countrycode")
 # ---- 7. Merge everything into one wide panel --------------------------------
 
 panel <- gdp
+panel <- merge(panel, hc, by = c("countrycode", "year"), all.x = TRUE)
 panel <- merge(panel, invest_open, by = c("countrycode", "year"), all.x = TRUE)
 panel <- merge(panel, inflation, by = c("countrycode", "year"), all.x = TRUE)
 panel <- merge(panel, polity, by = c("countrycode", "year"), all.x = TRUE)
@@ -304,6 +318,7 @@ dataprep_out <- dataprep(
     gdp_odd_year_predictors,
     list(
       list("gdp", pre_window, "mean"),
+      list("hc", pre_window, "mean"),
       list("ki", pre_window, "mean"),
       list("openk", pre_window, "mean"),
       list("inflation_deflator_pct", pre_window, "mean"),

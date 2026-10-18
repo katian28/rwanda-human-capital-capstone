@@ -7,18 +7,21 @@
 # "fake" gap is. If Rwanda's real gap is not bigger than most of these
 # fake gaps, that's evidence the gap is not statistically unusual.
 #
-# Uses Hodler's actual predictor set (PWT 7.1 investment/openness, WDI
-# GDP-deflator inflation, Polity, Freedom House, UCDP conflict), not the
-# earlier simplified GDP-only special predictors. This genuinely shrinks
-# the usable donor pool -- from 39 countries (GDP-only completeness) down
-# to the 37 with at least one real observation of every predictor in the
-# window (verified in code/14_predictor_assembly_check.R; dataprep()
-# itself handles any remaining partial-year gaps via na.rm=TRUE, verified
-# directly against its own source behavior, not assumed). Using
-# GDP-deflator inflation rather than WDI CPI is what keeps this pool at
-# 38 instead of 29: CPI has large real gaps across Sub-Saharan Africa
-# (including Liberia's entire pre-2002 history), the deflator does not.
-# A smaller but fully predictor-complete pool is the more defensible
+# Uses Hodler's actual full predictor set (PWT 8.0 human capital, PWT 7.1
+# investment/openness, WDI GDP-deflator inflation, Polity, Freedom House,
+# UCDP conflict), not the earlier simplified GDP-only special predictors.
+# This genuinely shrinks the usable donor pool -- from 39 countries
+# (GDP-only completeness) down to 37 with every non-hc predictor present
+# (verified in code/14_predictor_assembly_check.R; dataprep() itself
+# handles any remaining partial-year gaps via na.rm=TRUE, verified
+# directly against its own source behavior, not assumed), then down to 26
+# once PWT 8.0 human capital is added: 11 further countries have zero hc
+# data for 1985-1990, including Equatorial Guinea, the single largest
+# outlier in every earlier version of this test. Using GDP-deflator
+# inflation rather than WDI CPI is what kept the pool at 37 instead of 29
+# before the hc narrowing: CPI has large real gaps across Sub-Saharan
+# Africa (including Liberia's entire pre-2002 history), the deflator does
+# not. A smaller but fully predictor-complete pool is the more defensible
 # headline test than a larger pool built on a predictor set we know is
 # missing for many of its members.
 #
@@ -129,7 +132,7 @@ last_year <- 2011
 pre_window <- 1985:1990
 conflict_window <- 1991:1993
 
-# 37-country pool: Sub-Saharan Africa minus Rwanda and the spillover-risk
+# 26-country pool: Sub-Saharan Africa minus Rwanda and the spillover-risk
 # neighbors (Burundi, DR Congo, Tanzania, Uganda -- see docs/replication-
 # feasibility.md), further restricted to countries with at least one real
 # observation of EVERY Hodler predictor in its window (verified in
@@ -143,12 +146,17 @@ conflict_window <- 1991:1993
 # is excluded despite passing that predictor check: PWT 8.0 has zero
 # rgdpe (the dependent variable itself, not a special predictor) for
 # Somalia in any year used here -- a genuine PWT gap for a collapsed
-# state, not an avoidable sourcing choice.
-donors <- c("AGO", "BEN", "BWA", "BFA", "CPV", "CMR", "CAF", "TCD", "COM",
-            "COG", "CIV", "GNQ", "SWZ", "ETH", "GAB", "GMB", "GHA", "GIN",
-            "GNB", "KEN", "LSO", "LBR", "MDG", "MWI", "MLI", "MRT", "MUS",
-            "NAM", "NER", "NGA", "SEN", "SLE", "ZAF", "SDN", "TGO",
-            "ZMB", "ZWE")
+# state, not an avoidable sourcing choice. PWT 8.0 human capital (hc) --
+# added as a 7th predictor; see code/02's header comment -- has zero
+# 1985-1990 coverage for 11 further countries (AGO, BFA, CPV, TCD, COM,
+# GNQ, ETH, GIN, GNB, MDG, NGA), all dropped here for the same reason as
+# Somalia: missing the dependent variable or a predictor entirely, not a
+# sourcing choice. This removes Equatorial Guinea, the single largest
+# outlier in every earlier version of this placebo test -- a genuine
+# consequence of the data, not a convenient one.
+donors <- c("BEN", "BWA", "CMR", "CAF", "COG", "CIV", "SWZ", "GAB", "GMB",
+            "GHA", "KEN", "LSO", "LBR", "MWI", "MLI", "MRT", "MUS", "NAM",
+            "NER", "SEN", "SLE", "ZAF", "SDN", "TGO", "ZMB", "ZWE")
 
 # ---- 1. Load and merge Hodler's full predictor set -------------------------
 # Identical sourcing/merge logic to code/02 -- see there for full comments
@@ -165,6 +173,9 @@ for (c_ in unique(gdp$countrycode)) {
   baseline <- mean(gdp$gdp[m & gdp$year %in% 1991:1993])
   gdp$gdp[m] <- gdp$gdp[m] / baseline
 }
+
+hc <- pwt80[pwt80$countrycode %in% c("RWA", donors) & pwt80$year %in% pre_window,
+            c("countrycode", "year", "hc")]
 
 pwt71 <- read.csv("data/raw/pwt71.csv", stringsAsFactors = FALSE)
 invest_open <- pwt71[pwt71$isocode %in% c("RWA", donors) & pwt71$year %in% pre_window,
@@ -256,6 +267,7 @@ conflict_grid <- expand.grid(countrycode = c("RWA", donors), year = conflict_win
 conflict <- merge(conflict_grid, conflict, by = "countrycode")
 
 panel <- gdp
+panel <- merge(panel, hc, by = c("countrycode", "year"), all.x = TRUE)
 panel <- merge(panel, invest_open, by = c("countrycode", "year"), all.x = TRUE)
 panel <- merge(panel, inflation, by = c("countrycode", "year"), all.x = TRUE)
 panel <- merge(panel, polity, by = c("countrycode", "year"), all.x = TRUE)
@@ -273,6 +285,7 @@ hodler_special_predictors <- c(
   lapply(odd_years, function(yr) list("gdp", yr, "mean")),
   list(
     list("gdp", pre_window, "mean"),
+    list("hc", pre_window, "mean"),
     list("ki", pre_window, "mean"),
     list("openk", pre_window, "mean"),
     list("inflation_deflator_pct", pre_window, "mean"),

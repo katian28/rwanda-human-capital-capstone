@@ -2,7 +2,7 @@
 # Placebo tests for the 9-country donor pool (the published-weight
 # countries only). This is a restricted-pool SENSITIVITY check, not the
 # headline placebo result: see code/04_placebo_gdp_full_pool.R for the
-# full 37-country test, which is the one to trust.
+# full 26-country test, which is the one to trust.
 #
 # In-space placebo: reassign the "treatment" to each donor country in
 # turn and see how big a gap it gets by chance, compared to Rwanda's.
@@ -144,6 +144,12 @@ for (c_ in unique(gdp$countrycode)) {
   gdp$gdp[m] <- gdp$gdp[m] / baseline
 }
 
+# Human capital index (PWT 8.0) -- see code/02's header comment for why
+# this predictor was missing before and why it belongs here. All 9 donors
+# have complete coverage, same as code/02.
+hc <- pwt80[pwt80$countrycode %in% c("RWA", donors) & pwt80$year %in% pre_window,
+            c("countrycode", "year", "hc")]
+
 pwt71 <- read.csv("data/raw/pwt71.csv", stringsAsFactors = FALSE)
 invest_open <- pwt71[pwt71$isocode %in% c("RWA", donors) & pwt71$year %in% pre_window,
                       c("isocode", "year", "ki", "openk")]
@@ -207,6 +213,7 @@ conflict_grid <- expand.grid(countrycode = c("RWA", donors), year = conflict_win
 conflict <- merge(conflict_grid, conflict, by = "countrycode")
 
 panel <- gdp
+panel <- merge(panel, hc, by = c("countrycode", "year"), all.x = TRUE)
 panel <- merge(panel, invest_open, by = c("countrycode", "year"), all.x = TRUE)
 panel <- merge(panel, inflation, by = c("countrycode", "year"), all.x = TRUE)
 panel <- merge(panel, polity, by = c("countrycode", "year"), all.x = TRUE)
@@ -224,6 +231,7 @@ hodler_special_predictors <- c(
   lapply(odd_years, function(yr) list("gdp", yr, "mean")),
   list(
     list("gdp", pre_window, "mean"),
+    list("hc", pre_window, "mean"),
     list("ki", pre_window, "mean"),
     list("openk", pre_window, "mean"),
     list("inflation_deflator_pct", pre_window, "mean"),
@@ -328,7 +336,7 @@ lines <- c(
   "",
   sprintf("**Run date:** %s", format(Sys.Date(), "%d %B %Y")),
   "",
-  "This is a restricted-pool sensitivity check, not the headline placebo result -- see `results/placebo-full-pool-in-space.csv` / `code/04_placebo_gdp_full_pool.R` for the full 37-country test. In-space placebo uses Hodler's full documented predictor set (PWT 7.1 investment/openness, WDI inflation, Polity, Freedom House, UCDP conflict); the in-time placebo uses simpler GDP-only predictors since UCDP conflict data doesn't exist before 1989 and cannot be shifted back to a fake 1985 treatment's pre-period.",
+  "This is a restricted-pool sensitivity check, not the headline placebo result -- see `results/placebo-full-pool-in-space.csv` / `code/04_placebo_gdp_full_pool.R` for the full 26-country test. In-space placebo uses Hodler's full documented predictor set (PWT 7.1 investment/openness, WDI inflation, Polity, Freedom House, UCDP conflict); the in-time placebo uses simpler GDP-only predictors since UCDP conflict data doesn't exist before 1989 and cannot be shifted back to a fake 1985 treatment's pre-period.",
   "",
   "## In-space placebo",
   "",
