@@ -1,11 +1,23 @@
 #!/usr/bin/env Rscript
-# Checks whether Hodler's actual predictor set (PWT 7.1 investment/
-# openness, WDI inflation, Polity political regime, Freedom House
-# political rights, UCDP conflict) can actually be assembled for the
-# donors that matter, before rebuilding code/02 around it. Two donor
-# sets checked: Hodler's own 9 non-zero-weight donors (the minimum that
-# must work), and the project's 39-country full pool (for the eventual
-# full-pool placebo test).
+# Checks whether Hodler's actual predictor set (PWT 8.0 human capital,
+# PWT 7.1 investment/openness, WDI GDP-deflator inflation, Polity
+# political regime, Freedom House political rights, UCDP conflict -- all
+# seven confirmed directly against the manuscript PDF, see docs/
+# paper-facts-replication.md) can actually be assembled for the donors
+# that matter. Two donor sets checked: Hodler's own 9 non-zero-weight
+# donors (the minimum that must work), and the project's full Sub-Saharan
+# Africa candidate pool (43 countries once Rwanda and the four
+# spillover-risk neighbors are removed from the 48-country SSA list below
+# -- computed, not hardcoded, since an earlier version of this comment
+# just said "39" and went stale).
+#
+# The STRICT check below (every year in-window present, no na.rm
+# averaging) also answers a second question: Hodler's own placebo pool is
+# 22 countries (confirmed directly from the manuscript, Figure 1: "D: 1,
+# N: 22"), far smaller than this project's lenient-completeness pool. The
+# strict count here is the test of whether requiring full-window
+# completeness -- not a different candidate list -- is what explains the
+# gap.
 
 suppressPackageStartupMessages({
   library(readxl)
@@ -25,6 +37,13 @@ excluded <- c("BDI", "COD", "TZA", "UGA")
 full_pool <- setdiff(ssa_all, c("RWA", excluded))
 pre_window <- 1985:1990   # Hodler's standard predictor-averaging window
 conflict_window <- 1991:1993  # Hodler's conflict-specific window
+
+# ---- 0. PWT 8.0 human capital (hc) -----------------------------------------
+# Confirmed in the manuscript (p.7): "The human capital index from PWT
+# 8.0, which is based on years of schooling and an estimate of the rate
+# of return." Same file as the GDP outcome itself (pwt80.xlsx).
+
+pwt80 <- as.data.frame(read_excel("data/raw/pwt80.xlsx", sheet = "Data"))
 
 # ---- 1. PWT 7.1: investment share (ki), openness (openk) ------------------
 # COD is coded ZAR in this vintage; SSD doesn't exist; ERI has almost no data.
@@ -56,21 +75,30 @@ check_any <- function(df, code_col, year_col, value_col, codes, years, label) {
   out
 }
 
-cat("=== PWT 7.1 investment share (ki), 1985-1990 ===\n")
+cat("=== PWT 8.0 human capital (hc), 1985-1990 ===\n")
+hc_9 <- check_coverage(pwt80, "countrycode", "year", "hc", hodler9, pre_window, "Hodler-9")
+hc_full <- check_coverage(pwt80, "countrycode", "year", "hc", full_pool, pre_window, "Full-pool")
+
+cat("\n=== PWT 7.1 investment share (ki), 1985-1990 ===\n")
 pwt_ki_9 <- check_coverage(pwt71, "isocode", "year", "ki", hodler9, pre_window, "Hodler-9")
-pwt_ki_39 <- check_coverage(pwt71, "isocode", "year", "ki", full_pool, pre_window, "Full-39")
+pwt_ki_39 <- check_coverage(pwt71, "isocode", "year", "ki", full_pool, pre_window, "Full-pool")
 
 cat("\n=== PWT 7.1 openness (openk), 1985-1990 ===\n")
 pwt_openk_9 <- check_coverage(pwt71, "isocode", "year", "openk", hodler9, pre_window, "Hodler-9")
-pwt_openk_39 <- check_coverage(pwt71, "isocode", "year", "openk", full_pool, pre_window, "Full-39")
+pwt_openk_39 <- check_coverage(pwt71, "isocode", "year", "openk", full_pool, pre_window, "Full-pool")
 
-# ---- 2. WDI inflation -------------------------------------------------------
+# ---- 2. WDI GDP-deflator inflation ------------------------------------------
+# Confirmed in the manuscript (p.7): "inflation defined as the annual
+# change in the GDP deflator from WDI" -- not CPI. An earlier version of
+# this check used WDI CPI, which is what originally made this project
+# think Liberia and much of the full candidate pool had to be dropped;
+# the deflator does not have that problem (see docs/source-register.md).
 
-wdi <- read.csv("data/raw/wdi_inflation.csv", stringsAsFactors = FALSE)
+wdi <- read.csv("data/raw/wdi_inflation_deflator.csv", stringsAsFactors = FALSE)
 
-cat("\n=== WDI inflation, 1985-1990 ===\n")
-wdi_9 <- check_coverage(wdi, "countrycode", "year", "inflation_cpi_pct", hodler9, pre_window, "Hodler-9")
-wdi_39 <- check_coverage(wdi, "countrycode", "year", "inflation_cpi_pct", full_pool, pre_window, "Full-39")
+cat("\n=== WDI GDP-deflator inflation, 1985-1990 ===\n")
+wdi_9 <- check_coverage(wdi, "countrycode", "year", "inflation_deflator_pct", hodler9, pre_window, "Hodler-9")
+wdi_39 <- check_coverage(wdi, "countrycode", "year", "inflation_deflator_pct", full_pool, pre_window, "Full-pool")
 
 # ---- 3. Polity5 political regime (polity2) ---------------------------------
 
@@ -99,7 +127,7 @@ polity$scode <- ifelse(polity$scode %in% names(scode_to_iso3),
 
 cat("\n=== Polity5 polity2, 1985-1990 ===\n")
 pol_9 <- check_coverage(polity, "scode", "year", "polity2", hodler9, pre_window, "Hodler-9")
-pol_39 <- check_coverage(polity, "scode", "year", "polity2", full_pool, pre_window, "Full-39")
+pol_39 <- check_coverage(polity, "scode", "year", "polity2", full_pool, pre_window, "Full-pool")
 
 # ---- 4. Freedom House political rights (PR) --------------------------------
 # Wide format: triplets of (PR, CL, Status) columns per survey edition. Two
@@ -177,7 +205,7 @@ fh_long$iso3 <- name_to_iso3[trimws(fh_long$country)]
 
 cat("\n=== Freedom House political rights (PR), 1985-1990 ===\n")
 fh_9 <- check_coverage(fh_long, "iso3", "year", "pr", hodler9, pre_window, "Hodler-9")
-fh_39 <- check_coverage(fh_long, "iso3", "year", "pr", full_pool, pre_window, "Full-39")
+fh_39 <- check_coverage(fh_long, "iso3", "year", "pr", full_pool, pre_window, "Full-pool")
 
 # ---- 5. UCDP battle deaths, 1991-1993 conflict window ----------------------
 # Absence = true zero (no conflict crossed the reporting threshold), not
@@ -204,30 +232,42 @@ ucdp_full$bd_best[is.na(ucdp_full$bd_best)] <- 0  # true zero, confirmed
 
 cat("\n=== UCDP battle deaths, 1991-1993 (absence = 0, always complete) ===\n")
 cat("Hodler-9 complete for 9 of 9 (by construction, absence = 0)\n")
-cat("Full-39 complete for", length(full_pool), "of", length(full_pool), "(by construction, absence = 0)\n")
+cat("Full-pool complete for", length(full_pool), "of", length(full_pool), "(by construction, absence = 0)\n")
 
 # ---- 6. Combined verdict: which predictors actually block which donors ----
+# All SEVEN predictors now, including hc and the GDP outcome itself
+# (rgdpe) -- a country that's predictor-complete but has no GDP data at
+# all (Somalia) is not actually usable, so the outcome belongs in this
+# check too, not just the six external predictors.
 
-cat("\n\n=== COMBINED (STRICT: every year 1985-1990 present) ===\n")
-combined_9 <- pwt_ki_9 & pwt_openk_9 & wdi_9 & pol_9 & fh_9
+gdp_9 <- check_coverage(pwt80, "countrycode", "year", "rgdpe", hodler9, pre_window, "Hodler-9")
+gdp_full <- check_coverage(pwt80, "countrycode", "year", "rgdpe", full_pool, pre_window, "Full-pool")
+
+cat("\n\n=== COMBINED (STRICT: every year 1985-1990 present, all 7 predictors + GDP) ===\n")
+combined_9 <- gdp_9 & hc_9 & pwt_ki_9 & pwt_openk_9 & wdi_9 & pol_9 & fh_9
 print(combined_9)
 cat("All 9 pass:", all(combined_9), "\n")
-combined_39 <- pwt_ki_39 & pwt_openk_39 & wdi_39 & pol_39 & fh_39
-cat(sum(combined_39), "of", length(full_pool), "full-pool donors pass all five predictors (strict).\n")
-cat("Passing:", paste(full_pool[combined_39], collapse = ", "), "\n")
+combined_full <- gdp_full & hc_full & pwt_ki_39 & pwt_openk_39 & wdi_39 & pol_39 & fh_39
+cat(sum(combined_full), "of", length(full_pool), "full-pool donors pass all seven predictors + GDP (strict).\n")
+cat("Passing:", paste(full_pool[combined_full], collapse = ", "), "\n")
+cat("For comparison, Hodler's own manuscript reports a placebo pool of exactly 22 countries\n")
+cat("(Figure 1: \"D: 1, N: 22\" -- 23 candidates, 1 dropped by his own exclusion rule).\n")
+cat("Strict-completeness count above:", sum(combined_full), "+ Rwanda vs. his 22 + Rwanda.\n")
 
 cat("\n=== COMBINED (LENIENT: na.rm=TRUE mean, >=1 real year in window) ===\n")
-wdi_9_any <- check_any(wdi, "countrycode", "year", "inflation_cpi_pct", hodler9, pre_window, "WDI")
+hc_9_any <- check_any(pwt80, "countrycode", "year", "hc", hodler9, pre_window, "hc")
+wdi_9_any <- check_any(wdi, "countrycode", "year", "inflation_deflator_pct", hodler9, pre_window, "WDI")
 pol_9_any <- check_any(polity, "scode", "year", "polity2", hodler9, pre_window, "Polity")
 fh_9_any <- check_any(fh_long, "iso3", "year", "pr", hodler9, pre_window, "FH")
-combined_9_any <- pwt_ki_9 & pwt_openk_9 & wdi_9_any & pol_9_any & fh_9_any
+combined_9_any <- gdp_9 & hc_9_any & pwt_ki_9 & pwt_openk_9 & wdi_9_any & pol_9_any & fh_9_any
 print(combined_9_any)
 cat("All 9 pass (lenient):", all(combined_9_any), "\n")
 
-wdi_39_any <- check_any(wdi, "countrycode", "year", "inflation_cpi_pct", full_pool, pre_window, "WDI")
+hc_full_any <- check_any(pwt80, "countrycode", "year", "hc", full_pool, pre_window, "hc")
+wdi_39_any <- check_any(wdi, "countrycode", "year", "inflation_deflator_pct", full_pool, pre_window, "WDI")
 pol_39_any <- check_any(polity, "scode", "year", "polity2", full_pool, pre_window, "Polity")
 fh_39_any <- check_any(fh_long, "iso3", "year", "pr", full_pool, pre_window, "FH")
-combined_39_any <- pwt_ki_39 & pwt_openk_39 & wdi_39_any & pol_39_any & fh_39_any
-cat(sum(combined_39_any), "of", length(full_pool), "full-pool donors pass all five predictors (lenient).\n")
-cat("Passing:", paste(full_pool[combined_39_any], collapse = ", "), "\n")
-cat("Failing:", paste(full_pool[!combined_39_any], collapse = ", "), "\n")
+combined_full_any <- gdp_full & hc_full_any & pwt_ki_39 & pwt_openk_39 & wdi_39_any & pol_39_any & fh_39_any
+cat(sum(combined_full_any), "of", length(full_pool), "full-pool donors pass all seven predictors + GDP (lenient).\n")
+cat("Passing:", paste(full_pool[combined_full_any], collapse = ", "), "\n")
+cat("Failing:", paste(full_pool[!combined_full_any], collapse = ", "), "\n")

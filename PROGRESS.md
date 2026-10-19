@@ -2,6 +2,11 @@
 
 Add a new entry before each meeting. Newest at the top. Three lines is enough.
 
+## 2026-10-19
+- **Done:** Added PWT human capital as a 7th GDP predictor, confirmed directly against the manuscript PDF (an earlier version had missed it, no documented reason) — narrowed the full-pool donor list 37→26 and improved the placebo rank 18/38→9/27. Reading further into the manuscript then surfaced a bigger finding: this project's full-pool placebo test was never actually a reconstruction of Hodler's own inference — he uses a 22-country pool with year-by-year significance (a separate p-value for each post-treatment year), not a 26-country whole-period test. Built committee-meeting slides and prepped for the first committee meeting.
+- **Next:** Reconstruct Hodler's exact 22-country placebo pool and implement year-specific inference, reported alongside (not replacing) the existing full-pool test; repair code/14_predictor_assembly_check.R, which still reflects the pre-`hc` predictor set.
+- **Blocked:** None currently.
+
 ## 2026-10-12
 - **Done:** Fixed a replication-fidelity problem (Liberia, one of Hodler's own 9 donors, had been dropped because WDI CPI inflation has zero coverage for it pre-2002) by switching to WDI's GDP-deflator inflation series across code/02-06; full-pool placebo improved from 20/30 (p=0.667) to 18/38 (p=0.474). Rebuilt the immunization extension's predictors (added MCV1, UCDP conflict, GDP per capita; code/12), which also resolved Somalia's old weight-dominance problem at the source — placebo rank moved from 10/21 (p=0.476) to 12/19 (p=0.632), reported honestly even though weaker. Removed code/13 (now-redundant Somalia-exclusion check). Redrafted all 7 writing/drafts sections against the updated facts files.
 - **Next:** Review the redrafted sections end to end; decide whether to build an in-time placebo for the extension (the GDP side has one, the extension doesn't); update PLAN.md off its original human-capital-extension template before the first committee meeting.
