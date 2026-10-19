@@ -57,6 +57,10 @@ results/*
 !results/immunization-extension-placebo.csv
 !results/immunization-extension-in-time.csv
 !results/immunization-extension-summary.md
+!results/hodler-reconstruction-rgdpe-paths.csv
+!results/hodler-reconstruction-rgdpe-year-specific.csv
+!results/hodler-reconstruction-rgdpo-paths.csv
+!results/hodler-reconstruction-rgdpo-year-specific.csv
 
 # Private paper-writing orchestration -- not for the shared/advisor repo
 .claude/skills/write-replication/
