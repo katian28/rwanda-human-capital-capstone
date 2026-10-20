@@ -2,6 +2,11 @@
 
 Add a new entry before each meeting. Newest at the top. Three lines is enough.
 
+## 2026-10-20
+- **Done:** Reconstructed Hodler's actual placebo procedure (`code/15`), completing the work flagged as open on 10-19: a strict-completeness 24-candidate pool (within 2 of his reported 23), his own exclusion rule (drops Liberia, N=23 vs. his 22), and year-by-year significance instead of a single whole-period rank. Reproduces the qualitative shape of his reported p-value pattern (strong significance fading from 1994 through the 2000s) and gives a third independent confirmation that `rgdpe`, not `rgdpo`, is his real outcome variable. Repaired `code/14` along the way (was still CPI-based, pre-`hc`). Updated both facts docs and PLAN.md.
+- **Next:** Fold the 3d reconstruction into `writing/drafts/03-inference.md`, which still reflects the superseded 38-unit/rank-18 analysis; decide whether to update the committee slides with this finding too.
+- **Blocked:** None currently.
+
 ## 2026-10-19
 - **Done:** Added PWT human capital as a 7th GDP predictor, confirmed directly against the manuscript PDF (an earlier version had missed it, no documented reason) — narrowed the full-pool donor list 37→26 and improved the placebo rank 18/38→9/27. Reading further into the manuscript then surfaced a bigger finding: this project's full-pool placebo test was never actually a reconstruction of Hodler's own inference — he uses a 22-country pool with year-by-year significance (a separate p-value for each post-treatment year), not a 26-country whole-period test. Built committee-meeting slides and prepped for the first committee meeting.
 - **Next:** Reconstruct Hodler's exact 22-country placebo pool and implement year-specific inference, reported alongside (not replacing) the existing full-pool test; repair code/14_predictor_assembly_check.R, which still reflects the pre-`hc` predictor set.
